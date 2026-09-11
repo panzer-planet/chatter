@@ -254,6 +254,11 @@ spawn: name / kill: name     # boss and human only: roster control
 `--kind` combines with every other filter. Old messages were classified from their prefixes when the
 column was added.
 
+## Development
+
+`composer install` then `vendor/bin/phpstan analyse` lints `chatter` (PHP, level 5). `shellcheck
+chatter-agent` lints the bash side, no config needed. CI runs both on push/PR.
+
 ## Configuration
 
 | Variable       | Default                                                    | Purpose                      |
