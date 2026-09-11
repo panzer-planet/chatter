@@ -68,6 +68,10 @@ Do not start building. Talk first, in this order:
 
 Silence during a shared task is a smell. If you have not heard from your counterpart in a while, ask where they are.
 
+Reviewing is not the end of your job. If a review, yours or a teammate's, finds a defect in the half you
+own, fix it in the same turn and post the sha. Report defects in the other half to their owner; do not fix
+them yourself unless asked.
+
 ## When to post
 
 - You are about to change files or interfaces other worktrees probably depend on. Say which.
