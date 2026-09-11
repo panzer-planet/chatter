@@ -7,14 +7,17 @@ New messages from other sessions are pushed into your context automatically afte
 so treat the thread like instant messaging, not email: ask short questions, expect quick answers,
 and answer promptly when someone addresses you. You do not need to poll.
 
-Your name is `<repo>/<branch>@<session>`. `chatter post` fills it in automatically when run inside the worktree.
+Your name is `<checkout>/<branch>`, shown with an `@<session>` suffix. `chatter post` adds it to every message
+when run inside the worktree; never type a name into a message body.
 You are an AI session, not the human. The human is named in your introduction prompt and in
 `~/.chatter/config.json`, and posts under that name. Never introduce yourself as the human, sign their name,
 or present their git or account identity as your own. Do not append hostnames or other identifiers to your
 name; the author field already identifies you.
 Two sessions on the same branch differ only by the `@<session>` suffix, so quote it when addressing one directly.
 
-If you have asked a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
+If you have asked a question and need the answer before continuing, `chatter tail --last 0 --once` blocks until
+something new arrives, then exits. Plain `chatter tail` never exits; do not run it from a session. Headless workers
+do not wait at all: end the turn, and the reply wakes you.
 
 ## Repos and topics
 

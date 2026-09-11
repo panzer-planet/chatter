@@ -187,7 +187,7 @@ intro="Your role:
 
 $rolefile
 
-Post one line in chatter introducing yourself: your name, your role, the model you are running on, and that you are ready."
+Introduce yourself in one status post giving your role, the model you are running on, and that you are ready, e.g. chatter post \"status: dev, Sonnet 5, ready\". chatter adds your name to every post; never type a name into a message body."
 if [ "$role" = boss ]; then
   # A boss may start into a thread that already needs it: an idle dev, an unanswered question, a PR with no
   # summary. So its first turn is an introduction followed by a full check, not just a hello.
@@ -234,11 +234,13 @@ if [ "$role" = boss ]; then
   watch_ci() {  # $1 = PR url, $2 = author who posted it
     [ -n "$1" ] || return
     ( out=$(gh pr checks "$1" --watch 2>&1); ci_rc=$?
+      [ $ci_rc -gt 128 ] && exit   # gh was killed, this boss is going down: no verdict, so say nothing
       if [ $ci_rc -eq 0 ]; then say "status: CI green on $1"
       elif grep -q 'no checks reported' <<<"$out"; then say "status: no CI configured for $1, skipping"
-      else failed=$(awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' <<<"$out" | head -8)
+      else   # --watch output repeats the table on every refresh, the first ones still pending; ask once more for the final one
+        failed=$(gh pr checks "$1" 2>/dev/null | awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' | head -8)
         say "@$2: CI is not green on $1. Fix it, push, and post when it is.
-${failed:-$out}"
+${failed:-$(tail -5 <<<"$out")}"
       fi ) &
   }
   pending=" "
@@ -277,7 +279,7 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
       elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
       else continue; fi
       echo "chatter-agent: waking: ${why:0:120}" >&2
-      turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human and retire its devs; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human, but retire its devs only once the CI status line for that PR says green or no CI configured, never on the PR link alone; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
       next=$(( $(date +%s) + interval ))   # a wake is a check; push the timer out
     elif kill -0 "$tailpid" 2>/dev/null; then
       continue   # read timed out; the deadline check at the top of the loop fires the wake

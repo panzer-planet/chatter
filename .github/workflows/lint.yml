@@ -1,6 +1,9 @@
 name: lint
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]   # PR branches are covered by pull_request; both would run every job twice per commit
+  pull_request:
 
 jobs:
   shellcheck:

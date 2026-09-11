@@ -173,19 +173,27 @@ fclose($pipes[1]);
 fclose($pipes[2]);
 proc_close($proc);
 
-// --last 0 prints no snapshot, then blocks until something new arrives (the case PROTOCOL.md relies on)
-$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', ['tail', '--last', '0', '--json']));
+// --last 0 --once prints no snapshot, blocks until something new arrives, then exits (the case PROTOCOL.md relies on)
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', ['tail', '--last', '0', '--once', '--json']));
 $proc = proc_open($cmd, $spec, $pipes, null, array_merge($baseEnv, []));
 fclose($pipes[0]);
 $initial = readAvailable($pipes[1], 1.0);
-check(trim($initial) === '', 'tail: --last 0 prints nothing up front');
+check(trim($initial) === '' && proc_get_status($proc)['running'], 'tail: --last 0 --once prints nothing up front and keeps waiting');
 chatter(['post', '--as', 'tailer', 'unblocks tail --last 0']);
 $after = readAvailable($pipes[1], 3.0);
-check(str_contains($after, 'unblocks tail --last 0'), 'tail: --last 0 unblocks once a new message arrives');
+check(str_contains($after, 'unblocks tail --last 0'), 'tail: --last 0 --once prints the new message');
+check(!proc_get_status($proc)['running'], 'tail: --once exits after the first new message');
 proc_terminate($proc);
 fclose($pipes[1]);
 fclose($pipes[2]);
 proc_close($proc);
+
+// a tail whose parent dies exits by itself, even when nothing in its scope is posted to trip a broken pipe
+$sh = 'CHATTER_DB=' . escapeshellarg($db) . ' ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' tail --last 0 --repo quiet-repo >/dev/null 2>&1 & echo $!; sleep 1';   // sh outlives the tail's startup, or its first ppid is already 1
+$orphan = (int)shell_exec('sh -c ' . escapeshellarg($sh));
+usleep(3_500_000);   // one 2s poll after the sh parent exited
+check($orphan > 0 && !posix_kill($orphan, 0), 'tail: exits once orphaned by its parent');
+if ($orphan > 0) posix_kill($orphan, 15);
 
 // ---- notify: cross-session PostToolUse context ----
 

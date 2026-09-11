@@ -83,8 +83,8 @@ chatter read --from john              # only authors starting with "john"
 chatter read --grep 'decision:'       # only messages containing the text (case-insensitive)
 chatter read --json                   # one JSON object per line
 
-chatter tail                          # last 20, then follow live; this is your dashboard
-chatter tail --last 0                 # print nothing until something new arrives; blocks, for scripts
+chatter tail                          # last 20, then follow live until killed; this is your dashboard
+chatter tail --last 0 --once          # block until something new arrives, print it, exit; for sessions and scripts
 chatter whoami                        # the author, repo and topic a post from this shell would carry
 
 chatter post --topic yen-31 "..."     # tag a message with a topic; shown as "#12 [yen-31]"
@@ -143,7 +143,8 @@ chatter tail                          # watch them plan and build
 pkill -f "chatter-agent john"         # stop one
 ```
 
-A worker introduces itself when it starts, then follows `PROTOCOL.md`: critique the task, plan with the
+A worker introduces itself with a `status:` post when it starts (status, so a newcomer does not wake every
+other dev), then follows `PROTOCOL.md`: critique the task, plan with the
 others, converge on a `decision:`, build, and keep talking. It is told who the human is and that it is not
 them.
 
@@ -156,7 +157,8 @@ silence is the main thing it has to notice, and immediately when someone writes 
 `decision:`, posts a pull request link, or a worker's turn fails (`error:`), so the end of a task is
 handled as promptly as the start, and a worker that silently failed does not look like it is idling. A PR
 link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved): green is posted as a
-`status:` line, a failure is posted to the dev who opened the PR, which wakes them to fix it. It intervenes only
+`status:` line, a failure is posted to the dev who opened the PR, which wakes them to fix it. The boss retires a
+task's devs only after that verdict, not on the PR link, so a red build still has someone to fix it. It intervenes only
 for a short list of triggers (silence mid-task, unanswered questions, building without a plan, defects
 reported but not fixed, stale claims, unverified "unrelated", drift) and escalates to you by name if a nudge
 is ignored. Edit the role files to tune behaviour; add a file to add a role.
@@ -178,7 +180,7 @@ workflow is then:
 ```sh
 chatter-agent
 chatter post "@boss: get two devs on YEN-31, the Shopify seat purchase attribution"
-chatter tail                              # the boss spawns, assigns, watches, summarises, and kills when the PR is open
+chatter tail                              # the boss spawns, assigns, watches, summarises, and kills once the PR's CI is green
 ```
 
 Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start twice under one name;

@@ -174,5 +174,29 @@ out=$(echo '{"type":"result","is_error":true,"subtype":"error_max_turns","result
 assert_contains "show flags a failed turn" "$out" "✗ turn failed"
 assert_contains "show's failure line includes the reason" "$out" "boom"
 
+### watch_ci: a red verdict lists the final checks table, and a killed gh (boss shutting down) says nothing ###
+watch_ci_src=$(sed -n '/^  watch_ci() {/,/^  }/p' "$AGENT")
+[ -n "$watch_ci_src" ] || { echo "could not extract watch_ci() from $AGENT" >&2; exit 1; }
+eval "$watch_ci_src"
+said="$WORK/said"
+# shellcheck disable=SC2329  # called indirectly, by the eval'd watch_ci()
+say() { printf '%s\n' "$1" >>"$said"; }
+# shellcheck disable=SC2329
+gh() {  # --watch output starts with a still-pending snapshot; the plain call returns the final table
+  if [ "${4:-}" = --watch ]; then printf 'Refreshing checks status every 10 seconds. Press Ctrl+C to quit.\n\nlint\tpending\t0\thttps://x/1\t\n'; return 1; fi
+  printf 'lint\tfail\t5s\thttps://x/1\t\ntest\tpass\t3s\thttps://x/2\t\n'
+}
+watch_ci https://github.com/o/r/pull/9 dev1; wait $!
+out=$(cat "$said")
+assert_contains "watch_ci addresses a red PR to whoever posted it" "$out" "@dev1: CI is not green on https://github.com/o/r/pull/9"
+assert_contains "watch_ci lists the failed check from the final table" "$out" "lint: fail https://x/1"
+assert_eq "watch_ci leaves out the stale --watch snapshot and passing checks" "$(grep -c -e pending -e Refreshing -e 'test:' "$said")" 0
+
+rm -f "$said"
+# shellcheck disable=SC2329
+gh() { return 143; }
+watch_ci https://github.com/o/r/pull/9 dev1; wait $!
+assert "watch_ci posts nothing when gh is killed" [ ! -s "$said" ]
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

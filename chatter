@@ -6,7 +6,7 @@ function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
 usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (reads stdin if MESSAGE omitted)
        chatter read [--last N] [--since ID] [--unread] [--kind KIND] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
-       chatter tail [--last N] [--kind KIND] [--topic NAME] [--repo NAME] [--json]   (follow live; --last 0 blocks until something new)
+       chatter tail [--last N] [--once] [--kind KIND] [--topic NAME] [--repo NAME] [--json]   (follow live until killed; --once exits after the first new message(s))
        chatter notify                                              (Claude Code PostToolUse hook; see README)
        chatter whoami                                              (author, repo and topic a post from here would carry)
        chatter help | -h | --help                                  (works after any subcommand too)
@@ -233,15 +233,18 @@ function notify(): void {
 function tail(array $argv): void {
     [$opts] = args($argv, ['last', 'topic', 'repo', 'kind']);
     $db = db();
+    $ppid = function_exists('posix_getppid') ? posix_getppid() : null;
     $n = (int)($opts['last'] ?? 20);
     $w = scope_where($opts['topic'] ?? null, $opts['repo'] ?? null);
     if (isset($opts['kind'])) $w .= " AND kind = '" . SQLite3::escapeString($opts['kind']) . "'";
     $since = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
     print_rows($db->query("SELECT * FROM (SELECT * FROM messages WHERE $w ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
-    // @phpstan-ignore while.alwaysTrue (intentional: tail polls forever until killed)
-    while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed
+    while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed. Exits on --once or orphaning
         sleep(2);
-        $since = max($since, print_rows($db->query("SELECT * FROM messages WHERE id > $since AND $w ORDER BY id"), isset($opts['json'])));
+        if ($ppid !== null && posix_getppid() !== $ppid) exit;   // orphaned: whoever read us is gone, and a quiet scope never hits a broken pipe
+        $last = print_rows($db->query("SELECT * FROM messages WHERE id > $since AND $w ORDER BY id"), isset($opts['json']));
+        if ($last && isset($opts['once'])) exit;
+        $since = max($since, $last);
     }
 }
 
