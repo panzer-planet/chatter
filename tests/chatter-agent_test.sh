@@ -160,6 +160,46 @@ assert_eq "control posts nothing when a kill succeeds" "$(grep -c "killed dev" <
 assert_contains "control's kill actually terminates the process" "$result" "TARGET_KILLED=yes"
 assert_contains "control refuses to kill a name with no pidfile" "$say_section" "refused kill of dev 'nosuchdev': not running"
 
+### wake_reason(): the boss loop's wake decision (own-session skip, CI verdict, @boss, done:,
+### decision:, error:, PR link), extracted so each branch is testable without a live loop.
+wake_reason_src=$(sed -n '/^  wake_reason() {/,/^  }/p' "$AGENT")
+[ -n "$wake_reason_src" ] || { echo "could not extract wake_reason() from $AGENT" >&2; exit 1; }
+eval "$wake_reason_src"
+
+line() { printf '{"kind":"%s","body":"%s","author":"%s","session":"%s"}' "$1" "$2" "$3" "${4:-otherid}"; }
+
+assert_eq "wake_reason: silent on a plain status from someone else with no trigger" \
+  "$(wake_reason "$(line status "just chatting" dev1 zzz)" abc12345 "" "")" ""
+
+assert_eq "wake_reason: silent on the boss's own non-verdict post (own-session skip)" \
+  "$(wake_reason "$(line status "just chatting" boss abc12345)" abc12345 "" "")" ""
+
+# watch_ci posts a red verdict as kind chat, under the boss's own session, addressed to the dev:
+# no ci_verdict is set for it, so the own-session skip drops it and the boss is never woken.
+assert_eq "wake_reason: a red CI line stays silent, own-session skip beats the PR link in its body" \
+  "$(wake_reason "$(line chat "@dev1: CI is not green on https://github.com/o/r/pull/1" boss abc12345)" abc12345 "" "https://github.com/o/r/pull/1")" ""
+
+out=$(wake_reason "$(line status "CI green on https://github.com/o/r/pull/1" boss abc12345)" abc12345 1 "")
+assert_contains "wake_reason wakes on its own CI-green verdict despite the own-session skip" "$out" "CI verdict"
+
+out=$(wake_reason "$(line status "no CI configured for https://github.com/o/r/pull/1" boss abc12345)" abc12345 1 "")
+assert_contains "wake_reason wakes on its own no-CI verdict too" "$out" "CI verdict"
+
+out=$(wake_reason "$(line chat "hey @boss can you look" dev1 zzz)" abc12345 "" "")
+assert_contains "wake_reason wakes on an @boss mention" "$out" "Someone mentioned @boss"
+
+out=$(wake_reason "$(line done "done: foo.php sha1" dev1 zzz)" abc12345 "" "")
+assert_contains "wake_reason wakes on a done:" "$out" "A dev posted done:"
+
+out=$(wake_reason "$(line decision "decision: plan: x" dev1 zzz)" abc12345 "" "")
+assert_contains "wake_reason wakes on a decision:" "$out" "A stage transition was posted"
+
+out=$(wake_reason "$(line error "turn failed: boom" dev1 zzz)" abc12345 "" "")
+assert_contains "wake_reason wakes on an error:" "$out" "A worker turn failed"
+
+out=$(wake_reason "$(line status "here is https://github.com/o/r/pull/2" dev1 zzz)" abc12345 "" "https://github.com/o/r/pull/2")
+assert_contains "wake_reason wakes on a PR link" "$out" "A pull request link was posted"
+
 ### show(): renders claude's stream-json into the trace format the boss/dev turn loop scans for ###
 eval "$show_src"
 

@@ -242,6 +242,23 @@ if [ "$role" = boss ]; then
     esac
   }
   say() { CLAUDE_CODE_SESSION_ID=$sid chatter post "$1" 2>/dev/null; echo "chatter-agent: $1" >&2; }
+  # wake_reason LINE SID8 CI_VERDICT PR — decides whether LINE should wake the boss, and why. Echoes the
+  # reason, or nothing if none of the triggers apply. CI_VERDICT and PR are passed in rather than
+  # recomputed because the caller needs them anyway (to gate pr's own extraction and to call watch_ci).
+  # The own-session skip is duplicated here (the caller already applies it before the pending-introduction
+  # check) so this function is a complete, independently testable decision on its own.
+  wake_reason() {
+    local line=$1 sid8=$2 ci_verdict=$3 pr=$4 kind body
+    kind=$(jq -r .kind <<<"$line"); body=$(jq -r .body <<<"$line")
+    [[ $line == *"\"session\":\"$sid8\""* && -z $ci_verdict ]] && return
+    if [[ -n $ci_verdict ]]; then echo "CI verdict: ${body:0:120}. Post your two-line summary of that task for the human (delivered, left open) if you have not yet, then retire its devs"
+    elif [[ $line == *"@boss"* ]]; then echo "Someone mentioned @boss"
+    elif [[ $kind == "done" ]]; then echo "A dev posted done: ${body:0:120}. If that task still needs a review, make sure a named reviewer has been told it is ready (name one if nobody has been)"
+    elif [[ $kind == decision ]]; then echo "A stage transition was posted: decision: ${body:0:120}"
+    elif [[ $kind == error ]]; then echo "A worker turn failed: ${body:0:120}"
+    elif [ -n "$pr" ]; then echo "A pull request link was posted: ${body:0:120}"
+    fi
+  }
   # CI needs no model. When a PR link is posted, wait for its checks in the background and post the outcome:
   # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
   watch_ci() {  # $1 = PR url, $2 = author who posted it
@@ -294,13 +311,8 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
       pr=""; [[ -z $ci_verdict && $body == *"/pull/"* ]] && pr=$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)
       [ -n "$pr" ] && watch_ci "$pr" "$author"
       # Wake early on a mention, a stage transition (done:, decision:) or a PR link; everything else waits for the timer.
-      if [[ -n $ci_verdict ]]; then why="CI verdict: ${body:0:120}. Post your two-line summary of that task for the human (delivered, left open) if you have not yet, then retire its devs"   # summary first: 'retire' alone was read as the whole job
-      elif [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
-      elif [[ $kind == "done" ]]; then why="A dev posted done: ${body:0:120}. If that task still needs a review, make sure a named reviewer has been told it is ready (name one if nobody has been)"   # spelled out: 'act only if a trigger applies' read as 'do nothing'
-      elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
-      elif [[ $kind == error ]]; then why="A worker turn failed: ${body:0:120}"
-      elif [ -n "$pr" ]; then why="A pull request link was posted: ${body:0:120}"
-      else continue; fi
+      why=$(wake_reason "$line" "${sid:0:8}" "$ci_verdict" "$pr")
+      [ -n "$why" ] || continue
       echo "chatter-agent: waking: ${why:0:120}" >&2
       turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human, but retire its devs only once the CI status line for that PR says green or no CI configured, never on the PR link alone; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
       next=$(( $(date +%s) + interval ))   # a wake is a check; push the timer out
