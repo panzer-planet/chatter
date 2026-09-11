@@ -1,0 +1,211 @@
+#!/usr/bin/env php
+<?php
+// Black-box tests for chatter: runs the real CLI as a subprocess against a scratch SQLite file, never
+// ~/.chatter/chatter.db. Plain assert style, no framework: run with `php tests/chatter_test.php`.
+
+$bin = dirname(__DIR__) . '/chatter';
+$db = tempnam(sys_get_temp_dir(), 'chatter_test_') . '.db';
+register_shutdown_function(function () use ($db) {
+    foreach ([$db, "$db-wal", "$db-shm"] as $f) @unlink($f);
+});
+
+$baseEnv = [
+    'PATH' => getenv('PATH'),
+    'CHATTER_DB' => $db,
+    'CHATTER_REPO' => 'repoA',   // isolate scope_where repo tests from the real 'chatter' repo
+];
+
+$failures = [];
+$total = 0;
+function check(bool $cond, string $msg): void {
+    global $failures, $total;
+    $total++;
+    if (!$cond) $failures[] = $msg;
+    echo ($cond ? "ok - " : "FAIL - ") . $msg . "\n";
+}
+
+// Runs `chatter <args>` as a subprocess with the given env (merged over $baseEnv) and stdin; returns [exit code, stdout, stderr].
+function chatter(array $args, array $env = [], string $stdin = ''): array {
+    global $bin, $baseEnv;
+    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', $args));
+    $spec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $proc = proc_open($cmd, $spec, $pipes, null, array_merge($baseEnv, $env));
+    fwrite($pipes[0], $stdin);
+    fclose($pipes[0]);
+    $out = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $err = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    return [proc_close($proc), $out, $err];
+}
+
+// Decodes `read --json` output into a list of row arrays, one per line.
+function rows(string $out): array {
+    $rows = [];
+    foreach (explode("\n", trim($out)) as $line) {
+        if ($line !== '') $rows[] = json_decode($line, true);
+    }
+    return $rows;
+}
+
+// ---- post: kind splitting ----
+
+[$code, $out, $err] = chatter(['post', '--as', 'alice', 'hello there'], []);
+check($code === 0 && $out === '' && $err === '', 'post: plain message exits 0 with no output');
+
+[, $out] = chatter(['read', '--last', '1', '--json'], ['CHATTER_USER' => 'alice']);
+$r = rows($out)[0];
+check($r['kind'] === 'chat' && $r['body'] === 'hello there' && $r['author'] === 'alice', 'post: defaults to kind=chat, author from --as');
+
+chatter(['post', '--as', 'bob', 'status: running tests']);
+[, $out] = chatter(['read', '--last', '1', '--json']);
+$r = rows($out)[0];
+check($r['kind'] === 'status' && $r['body'] === 'running tests', 'post: "kind: body" prefix is lifted into the kind column');
+
+chatter(['post', '--as', 'bob', '--kind', 'gotcha', 'status: not actually a prefix here']);
+[, $out] = chatter(['read', '--last', '1', '--json']);
+$r = rows($out)[0];
+check($r['kind'] === 'gotcha' && $r['body'] === 'status: not actually a prefix here', '--kind overrides prefix-splitting, body kept verbatim');
+
+chatter(['post', '--as', 'bob', 'see http://example.com for details']);
+[, $out] = chatter(['read', '--last', '1', '--json']);
+$r = rows($out)[0];
+check($r['kind'] === 'chat' && $r['body'] === 'see http://example.com for details', 'post: a URL colon (no space after) is not mistaken for a kind prefix');
+
+[$code, , $err] = chatter(['post', '--as', 'bob', '--kind', 'BadKind', 'x']);
+check($code === 1 && str_contains($err, 'kind must be a lowercase word'), 'post: rejects a non-lowercase --kind');
+
+[$code, , $err] = chatter(['post', '--as', 'bob'], [], '   ');
+check($code === 2 && str_contains($err, 'empty message'), 'post: empty stdin body is rejected');
+
+[$code, $out] = chatter(['post', '--as', 'bob'], [], "from stdin\n");
+check($code === 0, 'post: reads the message from stdin when no positional arg is given');
+[, $out] = chatter(['read', '--last', '1', '--json']);
+check(rows($out)[0]['body'] === 'from stdin', 'post: stdin body is trimmed and stored');
+
+// ---- post: reply-to ----
+
+[, $out] = chatter(['read', '--last', '1', '--json']);
+$parentId = rows($out)[0]['id'];
+chatter(['post', '--as', 'bob', '--reply-to', (string)$parentId, 'agreed']);
+[, $out] = chatter(['read', '--last', '1', '--json']);
+check(rows($out)[0]['reply_to'] === $parentId, 'post: --reply-to is stored on the row');
+
+// ---- read: --since / --from / --grep ----
+
+chatter(['post', '--as', 'carol', 'marker message needle']);
+[, $out] = chatter(['read', '--since', (string)$parentId, '--json']);
+$sinceRows = rows($out);
+check(count($sinceRows) >= 1 && end($sinceRows)['body'] === 'marker message needle', 'read: --since only returns rows after that id');
+
+[, $out] = chatter(['read', '--from', 'car', '--json']);
+$fromRows = rows($out);
+check(count($fromRows) > 0 && array_reduce($fromRows, fn($ok, $r) => $ok && str_starts_with($r['author'], 'car'), true), 'read: --from matches authors by prefix');
+
+[, $out] = chatter(['read', '--grep', 'NEEDLE', '--json']);
+check(count(rows($out)) > 0 && str_contains(rows($out)[0]['body'], 'needle'), 'read: --grep matches case-insensitively');
+
+// ---- read: --unread cursor is per author ----
+
+chatter(['post', '--as', 'dave', 'first for dave to read']);
+[, $out1] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1']);
+[, $out2] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1']);
+check(count(rows($out1)) > 0 && count(rows($out2)) === 0, 'read: --unread cursor advances per author, second call sees nothing new');
+chatter(['post', '--as', 'dave', 'second for dave to read']);
+[, $out3] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1']);
+check(count(rows($out3)) === 1 && rows($out3)[0]['body'] === 'second for dave to read', 'read: --unread picks up only what arrived since the last read');
+
+// ---- scope_where: topic + repo filtering ----
+
+// A dedicated repo tag so this block's topic scoping isn't polluted by the untagged posts earlier tests made under repoA.
+$freshEnv = ['CHATTER_REPO' => 'repoScope'];
+chatter(['post', '--as', 'x', '--topic', 'topicX', 'in topic X'], $freshEnv);
+chatter(['post', '--as', 'x', '--topic', 'topicY', 'in topic Y'], $freshEnv);
+chatter(['post', '--as', 'x', 'untagged topic'], $freshEnv);
+chatter(['post', '--as', 'x', '--topic', 'topicX', 'done: cross-topic notice'], $freshEnv);
+
+[, $out] = chatter(['read', '--topic', 'topicX', '--json'], $freshEnv);
+$bodies = array_column(rows($out), 'body');
+check($bodies === ['in topic X', 'cross-topic notice'], 'read: explicit --topic is strict (no untagged, but same-topic done: included)');
+
+[, $out] = chatter(['read', '--json'], array_merge($freshEnv, ['CHATTER_TOPIC' => 'topicY']));
+$bodies = array_column(rows($out), 'body');
+sort($bodies);
+check($bodies === ['cross-topic notice', 'in topic Y', 'untagged topic'], 'read: CHATTER_TOPIC scopes to that topic + untagged + cross-topic kinds (done/decision/question)');
+
+[, $out] = chatter(['read', '--repo', 'repoB', '--json'], $freshEnv);
+check(rows($out) === [], 'read: --repo repoB sees none of the repoScope-tagged rows');
+
+[, $out] = chatter(['read', '--repo', 'repoScope', '--json'], $freshEnv);
+check(count(rows($out)) === 4, 'read: --repo repoScope sees exactly the repoScope-tagged rows');
+
+// ---- tail: initial snapshot + live follow ----
+
+function readAvailable($stream, float $seconds): string {
+    stream_set_blocking($stream, false);
+    $out = '';
+    $deadline = microtime(true) + $seconds;
+    while (microtime(true) < $deadline) {
+        $chunk = fread($stream, 65536);
+        if ($chunk !== false && $chunk !== '') $out .= $chunk;
+        usleep(100_000);
+    }
+    return $out;
+}
+
+chatter(['post', '--as', 'tailer', 'tail seed 1']);
+chatter(['post', '--as', 'tailer', 'tail seed 2']);
+
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', ['tail', '--last', '2', '--json']));
+$spec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+$proc = proc_open($cmd, $spec, $pipes, null, array_merge($baseEnv, []));
+fclose($pipes[0]);
+$snapshot = readAvailable($pipes[1], 1.5);
+$snapRows = rows($snapshot);
+check(count($snapRows) === 2 && $snapRows[1]['body'] === 'tail seed 2', 'tail: --last 2 prints the most recent 2 as an initial snapshot');
+
+chatter(['post', '--as', 'tailer', 'tail live message']);
+$live = readAvailable($pipes[1], 3.0);   // tail polls every 2s
+check(str_contains($live, 'tail live message'), 'tail: picks up a message posted after it started');
+
+proc_terminate($proc);
+fclose($pipes[1]);
+fclose($pipes[2]);
+proc_close($proc);
+
+// --last 0 prints no snapshot, then blocks until something new arrives (the case PROTOCOL.md relies on)
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', ['tail', '--last', '0', '--json']));
+$proc = proc_open($cmd, $spec, $pipes, null, array_merge($baseEnv, []));
+fclose($pipes[0]);
+$initial = readAvailable($pipes[1], 1.0);
+check(trim($initial) === '', 'tail: --last 0 prints nothing up front');
+chatter(['post', '--as', 'tailer', 'unblocks tail --last 0']);
+$after = readAvailable($pipes[1], 3.0);
+check(str_contains($after, 'unblocks tail --last 0'), 'tail: --last 0 unblocks once a new message arrives');
+proc_terminate($proc);
+fclose($pipes[1]);
+fclose($pipes[2]);
+proc_close($proc);
+
+// ---- notify: cross-session PostToolUse context ----
+
+[$code, $out] = chatter(['notify'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111']);
+check($code === 0 && trim($out) === '', 'notify: first call for a session sets its cursor and prints nothing');
+
+chatter(['post', '--as', 'other-session'], ['CLAUDE_CODE_SESSION_ID' => 'sessB2222'], 'message from another session');
+[, $out] = chatter(['notify'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111']);
+check(str_contains($out, 'message from another session') && str_contains($out, 'hookSpecificOutput'), 'notify: surfaces a message posted by a different session');
+$decoded = json_decode($out, true);
+check(($decoded['hookSpecificOutput']['hookEventName'] ?? null) === 'PostToolUse', 'notify: emits the PostToolUse hook JSON shape');
+
+chatter(['post', '--as', 'self'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111'], 'message from my own session');
+[, $out] = chatter(['notify'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111']);
+check(!str_contains($out, 'message from my own session'), 'notify: never echoes a session its own messages back');
+
+// ----
+
+printf("\n%d checks, %d failed\n", $total, count($failures));
+if ($failures) {
+    fwrite(STDERR, "\nFAILED:\n" . implode("\n", $failures) . "\n");
+    exit(1);
+}
