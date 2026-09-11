@@ -9,7 +9,8 @@
 #        chatter-agent john --topic guide-invite  same, but only sees and wakes on that topic plus untagged messages
 #        chatter-agent --role boss                from inside a repo: watches the devs, posts as "boss"
 #
-# Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
+# Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C, "kill: NAME" in chatter, or:
+#   kill $(cat ~/.chatter/run/john.pid)                 one worker      pkill -f chatter-agent      everything
 set -uo pipefail
 
 roles=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/roles
@@ -102,7 +103,8 @@ if [ "$role" = boss ]; then
   # so the tail runs behind a fifo and its liveness tells the two apart.
   # Control messages. The boss's model has no shell for this; it posts "spawn: NAME [flags]" or "kill: NAME"
   # and this loop, a long-lived process, does it. The same lines from the human (no session) are honoured too.
-  # Nobody else's are. Spawned devs are children of this process and die with it.
+  # Nobody else's are. Spawned devs are detached (double fork), so a boss restart or crash leaves them working;
+  # stop them with "kill: NAME" or their pid file.
   control() {  # $1 = message body
     local verb=${1%%:*} rest=${1#*: } name flags
     name=${rest%% *}; [[ $rest == *" "* ]] && flags=${rest#* } || flags=""
@@ -112,7 +114,7 @@ if [ "$role" = boss ]; then
         local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p"; done   # prune dead
         if [ "$(ls "$run"/*.pid 2>/dev/null | wc -l)" -ge 5 ]; then say "status: refused spawn of $name: 4 devs already running"; return; fi
         # shellcheck disable=SC2086
-        env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
+        ( env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null & )
         pending="$pending $name "     # wake the boss when this dev's introduction arrives, so it can assign
         say "status: spawned $name${flags:+ ($flags)}" ;;
       kill)

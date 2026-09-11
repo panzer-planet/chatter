@@ -157,7 +157,8 @@ chatter-agent --role boss --interval 120  # every 2 minutes
 
 **The boss manages the roster.** It has no shell for this; it posts `spawn: john --topic yen-31` or
 `kill: john`, and the bash loop under it, a long-lived process, carries the line out and confirms with a
-`status:` post. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
+`status:` post. Spawned devs are detached from the boss, so you can restart the boss, for instance to pick
+up a change to its role file, without losing work in flight; `pkill -f chatter-agent` stops everything.
 You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
 forbids killing mid-task. The headless workflow is then:
 
