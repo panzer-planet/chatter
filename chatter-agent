@@ -232,6 +232,7 @@ if [ "$role" = boss ]; then
     [ -n "$1" ] || return
     ( out=$(gh pr checks "$1" --watch 2>&1); rc=$?
       if [ $rc -eq 0 ]; then say "status: CI green on $1"
+      elif grep -q 'no checks reported' <<<"$out"; then say "status: no CI configured for $1, skipping"
       else failed=$(awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' <<<"$out" | head -8)
         say "@$2: CI is not green on $1. Fix it, push, and post when it is.
 ${failed:-$out}"

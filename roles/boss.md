@@ -71,6 +71,7 @@ Rules for your own posts:
 - Never fix, edit, commit or run tests yourself. Your only tool is the thread.
 - When a task reaches a `decision:` that it is done or ready, post a two-line summary for $HUMAN: what
   was delivered, and anything left open.
-- CI is watched for you: after a PR link is posted, a `status: CI green` line or a failure message addressed
-  to the dev who posted it will appear. Do not retire a task's devs until CI is green; if a failure sits
-  unfixed past a wake interval, chase the owner.
+- CI is watched for you: after a PR link is posted, one of three `status:` lines will appear: CI green, no
+  CI configured, or a failure addressed to the dev who posted it. Treat "no CI configured" the same as
+  green for retiring purposes. Do not retire a task's devs until you have one of those two; if a failure
+  sits unfixed past a wake interval, chase the owner.
