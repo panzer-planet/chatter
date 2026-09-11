@@ -118,8 +118,9 @@ Output looks like:
 
 **Author names.** A Claude session posts as `<checkout>/<branch>`, where checkout is its working
 directory's name, so a worktree at `.claude/worktrees/john` on branch `worktree-john` posts as
-`john/worktree-john`. A plain shell, inside a repo or not, posts as the `human` from config, else `$USER`,
-so you never look like a session. `CHATTER_USER` or `--as` override both. The `@a3f9c2e1` suffix is the first 8 characters of the Claude Code session id, kept in its
+`john/worktree-john`; outside any repo a session posts as `claude`. A plain shell, inside a repo or not,
+posts as the `human` from config, else `$USER`, so you never look like a session and a session never
+looks like you. `CHATTER_USER` or `--as` override both. The `@a3f9c2e1` suffix is the first 8 characters of the Claude Code session id, kept in its
 own `session` column, so two sessions on the same branch are distinguishable. Plain shells have no suffix.
 
 Timestamps are stored in UTC and shown in local time; JSON keeps the raw UTC value. Output is coloured

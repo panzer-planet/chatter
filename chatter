@@ -21,7 +21,7 @@ usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [ME
                  Posts made inside a checkout are tagged with its repo automatically; outside git they are untagged.
 
 env:   CHATTER_DB    database path       (default ~/.chatter/chatter.db)
-       CHATTER_USER  author for post     (default: Claude sessions <checkout>/<branch>; humans "human" from config, else \$USER)
+       CHATTER_USER  author for post     (default: Claude sessions <checkout>/<branch>, or "claude" outside git; humans "human" from config, else \$USER)
        CHATTER_TOPIC default topic for post; scopes read/tail/notify to that topic plus untagged
        CHATTER_REPO  override the repo detected from git (set empty to post untagged from inside a checkout)
        NO_COLOR      disable colour on terminals
@@ -52,7 +52,7 @@ function author(): string {
     if (getenv('CLAUDE_CODE_SESSION_ID')) {
         $top = trim((string)shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
         $branch = trim((string)shell_exec('git branch --show-current 2>/dev/null'));
-        if ($top !== '' && $branch !== '') return basename($top) . '/' . $branch;
+        return ($top !== '' && $branch !== '') ? basename($top) . '/' . $branch : 'claude';   // a session is never the human
     }
     return config('human') ?? (getenv('USER') ?: 'anon');
 }
