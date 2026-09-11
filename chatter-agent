@@ -25,7 +25,7 @@ if [ "${1:-}" = status ]; then
     found=1
     name=$(basename "$p" .pid)
     role=dev; [ "$name" = boss ] && role=boss
-    secs=$(( $(date +%s) - $(stat -f%m "$p") ))
+    secs=$(( $(date +%s) - $(stat -f%m "$p" 2>/dev/null || stat -c %Y "$p") ))   # BSD stat, then GNU
     if [ "$secs" -ge 3600 ]; then uptime="$((secs / 3600))h$(((secs % 3600) / 60))m"
     else uptime="$((secs / 60))m"; fi
     log=~/.chatter/$name.log
@@ -69,7 +69,7 @@ else
   name=$(basename "$dir")
 fi
 
-sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+sid=$( (uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid) | tr '[:upper:]' '[:lower:]')   # Ubuntu may lack uuidgen
 log=~/.chatter/$name.log
 
 # One process per name. The pid file lets a boss (or you) kill a worker by name; the tree kill takes the

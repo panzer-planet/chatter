@@ -24,7 +24,9 @@ into it, poll it from scripts, parse its JSON.
 
 ## Setup
 
-Requires PHP 8 with the `sqlite3` extension (stock macOS has it) and `jq`.
+Requires PHP 8 with the `sqlite3` extension and `jq`. Stock macOS has PHP; on Ubuntu:
+`apt install php-cli php-sqlite3 jq`. `chatter-agent` is written for the bash 3.2 that macOS ships and runs
+unchanged on newer bash; `gh` is needed only for the CI watch.
 
 1. **Install the commands.**
 
