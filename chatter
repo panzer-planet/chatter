@@ -4,9 +4,9 @@
 
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
-usage: chatter post [--as NAME] [MESSAGE]     (reads stdin if MESSAGE omitted)
-       chatter read [--since ID] [--last N] [--json]
-       chatter tail [--last N] [--json]            (follow the thread; Ctrl-C to stop)
+usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]   (reads stdin if MESSAGE omitted)
+       chatter read [--since ID] [--last N] [--from NAME] [--grep TEXT] [--json]
+       chatter tail [--last N] [--json]                         (follow the thread; Ctrl-C to stop)
 
 env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
        CHATTER_USER default author    (default \$USER)
@@ -40,10 +40,13 @@ function db(): SQLite3 {
         id         INTEGER PRIMARY KEY,
         author     TEXT NOT NULL,
         session    TEXT NOT NULL DEFAULT \'\',
+        reply_to   INTEGER,
         body       TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
     )');
-    @$db->exec("ALTER TABLE messages ADD COLUMN session TEXT NOT NULL DEFAULT ''"); // migrate pre-session dbs; no-op if present
+    // migrate older dbs; each is a no-op if the column already exists
+    @$db->exec("ALTER TABLE messages ADD COLUMN session TEXT NOT NULL DEFAULT ''");
+    @$db->exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
     return $db;
 }
 
@@ -65,23 +68,27 @@ function args(array $argv, array $valued): array {
 }
 
 function post(array $argv): void {
-    [$opts, $pos] = args($argv, ['as']);
+    [$opts, $pos] = args($argv, ['as', 'reply-to']);
     $author = $opts['as'] ?? author();
     $body = $pos[0] ?? stream_get_contents(STDIN);
     $body = trim($body);
     if ($body === '') { fwrite(STDERR, "chatter: empty message\n"); exit(2); }
 
-    $st = db()->prepare('INSERT INTO messages (author, session, body) VALUES (:a, :s, :b)');
+    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, body) VALUES (:a, :s, :r, :b)');
     $st->bindValue(':a', $author);
     $st->bindValue(':s', substr((string)getenv('CLAUDE_CODE_SESSION_ID'), 0, 8));
+    $st->bindValue(':r', isset($opts['reply-to']) ? (int)$opts['reply-to'] : null, isset($opts['reply-to']) ? SQLITE3_INTEGER : SQLITE3_NULL);
     $st->bindValue(':b', $body);
     $st->execute();
 }
 
 function read(array $argv): void {
-    [$opts] = args($argv, ['since', 'last']);
-    $sql = 'SELECT id, author, session, body, created_at FROM messages';
-    if (isset($opts['since'])) $sql .= ' WHERE id > ' . (int)$opts['since'];
+    [$opts] = args($argv, ['since', 'last', 'from', 'grep']);
+    $where = ['1'];
+    if (isset($opts['since'])) $where[] = 'id > ' . (int)$opts['since'];
+    if (isset($opts['from']))  $where[] = "author LIKE '" . SQLite3::escapeString($opts['from']) . "%'";
+    if (isset($opts['grep']))  $where[] = "body LIKE '%" . SQLite3::escapeString($opts['grep']) . "%'";
+    $sql = 'SELECT * FROM messages WHERE ' . implode(' AND ', $where);
     if (isset($opts['last'])) {
         // newest N, then flip back to chronological order
         $sql = "SELECT * FROM ($sql ORDER BY id DESC LIMIT " . (int)$opts['last'] . ') ORDER BY id';
@@ -99,7 +106,7 @@ function print_rows(SQLite3Result $res, bool $json): int {
         $last = $row['id'];
         echo $json
             ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-            : sprintf("#%d  %s  %s: %s\n", $row['id'],
+            : sprintf("#%d%s  %s  %s: %s\n", $row['id'], $row['reply_to'] ? ' (re #' . $row['reply_to'] . ')' : '',
                 (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i'),
                 $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : ''), $row['body']);
     }

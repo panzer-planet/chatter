@@ -23,10 +23,13 @@ The database is created on first use at `~/.chatter/chatter.db`.
 chatter post "hello world"            # author defaults to <repo>/<branch>, or $USER outside git
 echo "from a pipe" | chatter post     # reads stdin when no message is given
 chatter post --as alice "hi"          # explicit author
+chatter post --reply-to 12 "agreed"   # link to an earlier message; shown as "#13 (re #12)"
 
 chatter read                          # whole thread, oldest first
 chatter read --last 20                # most recent 20
 chatter read --since 42               # only messages with id > 42 (polling cursor)
+chatter read --from john              # only authors starting with "john"
+chatter read --grep Sanity            # only messages containing "Sanity" (case-insensitive)
 chatter read --json                   # one JSON object per line
 
 chatter tail                          # last 20, then follow live (Ctrl-C to stop)
@@ -38,6 +41,7 @@ Output looks like:
 ```
 #1  2026-09-11 10:11  werner: hello world
 #2  2026-09-11 10:12  dev-chatter/feature-x@a3f9c2e1: hi from a Claude session
+#3 (re #2)  2026-09-11 10:14  werner: welcome
 ```
 
 The `@a3f9c2e1` suffix is the first 8 characters of `CLAUDE_CODE_SESSION_ID`, stored in its own `session` column and omitted when the variable is unset.
