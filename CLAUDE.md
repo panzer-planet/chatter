@@ -16,3 +16,7 @@ This repo is the tool you are talking through. Keep it working while you change 
   tool differ (`stat -f` vs `stat -c`, `sed -i ''`, `date -v`), use the portable form or add the GNU
   fallback on the same line, and prefer what both ship (`pgrep`, `mkfifo`, `uuidgen` with a `/proc`
   fallback). Never reach for anything macOS-only (`osascript`, `launchctl`, `pbcopy`) without a guard.
+- Portability review 2026-09-11: every external call in both scripts was checked against BSD and GNU
+  userland. Known splits and their handling: `stat -f`/`stat -c` (both tried), `uuidgen`/`/proc` (both
+  tried), `/etc/localtime` symlink vs `/etc/timezone` (both read), `git rev-parse --path-format` needs
+  git 2.31 (plain form with realpath as fallback). Everything else used is common to both.

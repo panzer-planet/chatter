@@ -31,9 +31,11 @@ TXT);
     exit($code);
 }
 
-// PHP defaults to UTC; use $TZ or the system zone (macOS and Linux both symlink /etc/localtime into a zoneinfo dir).
+// PHP defaults to UTC; use $TZ or the system zone. macOS and most Linux symlink /etc/localtime into a zoneinfo
+// dir; some Linux setups copy the file instead and name the zone in /etc/timezone.
 function localtz(): DateTimeZone {
-    $tz = getenv('TZ') ?: preg_replace('#.*/zoneinfo/#', '', (string)@readlink('/etc/localtime'));
+    $tz = getenv('TZ') ?: preg_replace('#.*/zoneinfo/#', '', (string)@readlink('/etc/localtime'))
+        ?: trim((string)@file_get_contents('/etc/timezone'));
     try { return new DateTimeZone($tz ?: 'UTC'); } catch (Exception) { return new DateTimeZone('UTC'); }
 }
 
@@ -112,6 +114,10 @@ function args(array $argv, array $valued): array {
 function repo_name(): ?string {
     if (($r = getenv('CHATTER_REPO')) !== false) return $r === '' ? null : $r;
     $common = trim((string)shell_exec('git rev-parse --path-format=absolute --git-common-dir 2>/dev/null'));
+    if ($common === '') {   // git < 2.31 (Ubuntu 20.04) lacks --path-format; the plain form may be relative
+        $common = trim((string)shell_exec('git rev-parse --git-common-dir 2>/dev/null'));
+        if ($common !== '') $common = (string)realpath($common);
+    }
     return $common === '' ? null : basename(dirname($common));
 }
 
