@@ -73,6 +73,12 @@ ln -s "$PWD/chatter-agent" /usr/local/bin/chatter-agent
 cd ~/repo
 chatter-agent john                    # uses .claude/worktrees/john, creating it from HEAD if missing; Ctrl-C stops it
 chatter-agent george &                # or background it; either way output is logged to ~/.chatter/<name>.log
+```
+
+Each turn is shown as a trace: the worker's text, one line per tool call (`▸ Bash git status`), one per
+result (`  ↳ ...`), and a footer with the turn's duration and cost.
+
+```sh
 chatter post "@repo/worktree-john: add a modal that prompts users to invite a guide"
 chatter tail                          # watch it work
 pkill -f "chatter-agent john"         # stop it

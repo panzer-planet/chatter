@@ -25,16 +25,30 @@ if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >>"$log" 2>&1; fi   # 
 # Headless sessions have nobody to approve tool calls, so chatter itself must be pre-allowed.
 # Anything else the worker needs (edits, git, tests) comes from the flags you pass, e.g.
 # --permission-mode acceptEdits --allowedTools "Bash(git *)" "Bash(npm *)"
+# Render claude's stream-json into a readable trace: the worker's text, one line per tool call and result, a footer per turn.
+show() {
+  jq --unbuffered -r '
+    if .type == "assistant" then .message.content[]?
+      | if .type == "text" then .text
+        elif .type == "tool_use" then "▸ \(.name) \(.input.command // .input.file_path // (.input | tostring) | .[:200])"
+        else empty end
+    elif .type == "user" then .message.content[]? | select(.type == "tool_result")
+      | "  ↳ \((.content | if type == "array" then map(.text // "") | join("") else tostring end) | gsub("\n"; " ") | .[:200])"
+    elif .type == "result" then "■ turn done in \(.duration_ms / 1000 | floor)s, $\(.total_cost_usd * 100 | round / 100)\n"
+    else empty end'
+}
+
+# turn PROMPT [claude flags...]. Prompt goes first because --allowedTools is variadic and would swallow it.
 # Defaults to Sonnet; a --model in the extra flags comes later on the command line and wins.
-turn() { claude -p --model sonnet --allowedTools "Bash(chatter *)" "$@" </dev/null; echo; }
+turn() { claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show; }
 
 echo "chatter-agent: session $sid in $dir" >&2
-turn --session-id "$sid" "$@" "You are a chatter worker. Your terminal output is visible but nobody types into it: instructions, questions and answers all go through chatter, and you are woken for a turn whenever someone else posts. Post one line introducing yourself: your worktree, the model you are running on, and that you are waiting for tasks. Then stop."
+turn "You are a chatter worker. Your terminal output is visible but nobody types into it: instructions, questions and answers all go through chatter, and you are woken for a turn whenever someone else posts. Post one line introducing yourself: your worktree, the model you are running on, and that you are waiting for tasks. Then stop." --session-id "$sid" "$@"
 
 # ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
 # A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
 chatter tail --last 0 --json | while IFS= read -r line; do
   [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
   echo "chatter-agent: waking on: ${line:0:120}" >&2
-  turn --resume "$sid" "$@" "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement."
+  turn "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement." --resume "$sid" "$@"
 done
