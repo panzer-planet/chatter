@@ -61,7 +61,6 @@ done
 if [ "$role" = boss ]; then
   name=boss
   export CHATTER_USER=boss                      # the boss has no worktree; it posts under its role name
-  args=(--model haiku ${args[@]+"${args[@]}"})  # reading and nudging is Haiku work; a later --model from you still wins
   args+=(--disallowedTools Edit Write MultiEdit NotebookEdit)   # no hands: the thread is its only tool
 else
   [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]   (no name starts a boss)" >&2; exit 1; }

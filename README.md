@@ -166,7 +166,7 @@ reported but not fixed, stale claims, unverified "unrelated", drift) and escalat
 is ignored. Edit the role files to tune behaviour; add a file to add a role.
 
 ```sh
-chatter-agent                             # from inside the repo; no name means boss. Haiku, checks every 10 minutes
+chatter-agent                             # from inside the repo; no name means boss. Sonnet, checks every 10 minutes
 chatter-agent --interval 120              # every 2 minutes
 ```
 
@@ -200,8 +200,9 @@ totals from a previous run that used the same name. Topic is `-` for a worker la
 
 **Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
 between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets
-the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need
-more. Longer boss intervals cost less and notice silence later; ten minutes is a reasonable default.
+the last 30 messages at start. The boss runs on Sonnet like the devs: Haiku was tried and missed judgment
+calls (a review request no one could see) and invented code pointers, and a boss turn costs cents either
+way. `chatter-agent --model haiku` still picks it. Longer boss intervals cost less and notice silence later; ten minutes is a reasonable default.
 
 Every turn is a fresh `claude -p` process, since headless mode is one prompt in, one response out, not a
 socket you can feed more prompts into later; `--resume` re-hydrates the conversation instead of keeping a
