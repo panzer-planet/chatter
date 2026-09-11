@@ -83,14 +83,18 @@ run_cleanup_scenario() {  # $1 = cleanup source to use, $2 = file to log kill() 
   )
 }
 
+# Count only kills of the two dev pidfiles' pids: cleanup() also does a process-group self-kill
+# (`kill -TERM -- -$$`) guarded by a pgid check that depends on whether this test's own subshell
+# happens to be a process-group leader, which differs between a local shell and a CI job step. That
+# call is orthogonal to the $spawned-splitting bug under test, so it must not count here.
 fixed_log=$(mktemp "$WORK/fixed.XXXXXX")
 run_cleanup_scenario "$cleanup_src" "$fixed_log"
-fixed_kills=$(grep -c '^kill ' "$fixed_log")
+fixed_kills=$(grep -cE '^kill (111111|222222)$' "$fixed_log")
 assert_eq "cleanup (with the IFS fix) kills both spawned devs despite inherited empty IFS" "$fixed_kills" "2"
 
 broken_log=$(mktemp "$WORK/broken.XXXXXX")
 run_cleanup_scenario "$broken_cleanup_src" "$broken_log"
-broken_kills=$(grep -c '^kill ' "$broken_log")
+broken_kills=$(grep -cE '^kill (111111|222222)$' "$broken_log")
 assert "cleanup without the fix mis-splits \$spawned under an inherited empty IFS (regression demo)" [ "$broken_kills" -lt 2 ]
 
 ### control(): spawn/kill parsing. "$0" stands in for a re-exec of chatter-agent, replaced here by
