@@ -103,6 +103,8 @@ echo "chatter-agent: $name ($role) logging to $log"
 echo "chatter-agent: session start $(date -u '+%Y-%m-%dT%H:%M:%SZ')"   # marks where this run's log begins, so status can tell this run's spend from a previous run's
 
 # Render claude's stream-json into a readable trace: the worker's text, one line per tool call and result, a footer per turn.
+# A "result" event with is_error true or a non-success subtype means the turn failed even though claude itself
+# exited 0, so it gets the same "✗ turn failed" line turn() looks for below.
 show() {
   jq --unbuffered -r '
     if .type == "assistant" then .message.content[]?
@@ -111,7 +113,11 @@ show() {
         else empty end
     elif .type == "user" then .message.content[]? | select(.type == "tool_result")
       | "  ↳ \((.content | if type == "array" then map(.text // "") | join("") else tostring end) | gsub("\n"; " ") | .[:200])"
-    elif .type == "result" then "■ turn done in \(.duration_ms / 1000 | floor)s, $\(.total_cost_usd * 100 | round / 100)\n"
+    elif .type == "result" then
+      if .is_error == true or (.subtype // "success") != "success" then
+        "✗ turn failed (\(if (.subtype // "success") == "success" then "error" else .subtype end)): \((.result // .error // "") | tostring | .[:300])"
+      else "■ turn done in \(.duration_ms / 1000 | floor)s, $\(.total_cost_usd * 100 | round / 100)\n"
+      end
     else empty end'
 }
 
@@ -119,7 +125,28 @@ show() {
 # Defaults to Sonnet; a --model in the extra flags comes later on the command line and wins.
 # Runs in the background and waits: bash defers signal traps while a foreground command runs, so a kill
 # during a turn would otherwise sit until the turn finished. wait is a builtin and is interrupted at once.
-turn() { ( claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show ) & wait $!; }
+# PIPESTATUS only survives a pipeline run directly in this shell, not through a $(...) capture, so the
+# trace is teed to a temp file to inspect after the fact rather than captured via command substitution.
+# A failed turn (non-zero claude exit, an is_error/bad-subtype result from show(), or no output at all --
+# claude producing nothing looks identical to an idle worker) gets one clear line in the log plus a
+# 'error:' chatter post, since a log line nobody is tailing doesn't help the boss notice.
+turn() {
+  (
+    local trace; trace=$(mktemp)
+    claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show | tee "$trace"
+    local rc=("${PIPESTATUS[@]}") claude_rc="" err=""
+    claude_rc=${rc[0]}
+    if [ "$claude_rc" -ne 0 ]; then err="claude exited $claude_rc"
+    elif grep -q '^✗ turn failed' "$trace"; then err=$(grep -m1 '^✗ turn failed' "$trace" | sed 's/^✗ turn failed //')
+    elif ! grep -q '^■ turn done' "$trace"; then err="empty stream, no output from claude"
+    fi
+    rm -f "$trace"
+    if [ -n "$err" ]; then
+      echo "✗ turn failed: $err"
+      CLAUDE_CODE_SESSION_ID=$sid chatter post "error: turn failed: $err" 2>/dev/null
+    fi
+  ) & wait $!
+}
 
 # Same reason for the message loop: the tail runs behind a fifo and the loop uses the read builtin.
 open_tail() { fifo=$(mktemp -u); mkfifo "$fifo"; chatter tail --last 0 --json >"$fifo" & tailpid=$!; exec 3<"$fifo"; }
@@ -230,6 +257,7 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
       # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
       if [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
       elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
+      elif [[ $kind == error ]]; then why="A worker turn failed: ${body:0:120}"
       elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
       else continue; fi
       echo "chatter-agent: waking: ${why:0:120}" >&2
