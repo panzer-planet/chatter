@@ -137,7 +137,7 @@ into it; tasks, questions and answers go through chatter.
 ```sh
 cd ~/repo
 chatter-agent john                    # runs in .claude/worktrees/john, creating it from origin's default branch if missing
-chatter-agent george &                # background is fine; output also goes to ~/.chatter/<name>.log
+chatter-agent george &                # background is fine; output also goes to ~/.chatter/logs/<repo>/<name>.log
 chatter post "@john/worktree-john @george/worktree-george: add a modal that prompts users to invite a guide"
 chatter tail                          # watch them plan and build
 pkill -f "chatter-agent john"         # stop one
@@ -183,11 +183,13 @@ chatter post "@boss: get two devs on YEN-31, the Shopify seat purchase attributi
 chatter tail                              # the boss spawns, assigns, watches, summarises, and kills once the PR's CI is green
 ```
 
-Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start twice under one name;
-`kill $(cat ~/.chatter/run/john.pid)` stops a worker and its running turn from anywhere.
+Every `chatter-agent` writes `~/.chatter/run/<repo>/<name>.pid`, namespaced by repo (`_none` outside git)
+so a same-named worker in another repo can't collide with it, and refuses to start twice under one name
+within that repo; `kill $(cat ~/.chatter/run/chatter/john.pid)` stops a worker and its running turn from
+anywhere.
 
 ```sh
-chatter-agent status   # name role uptime spend topic, one line per running worker; "no workers" when none
+chatter-agent status   # repo name role uptime spend topic, one line per running worker across every repo; "no workers" when none
 ```
 
 Spend is summed from the log's `■ turn done` footers since a `chatter-agent: session start` marker,
@@ -290,7 +292,8 @@ side-effecting code) and exercises them with sleep/fifo stand-ins, never launchi
 |---------|--------------------------------------------------------------------------------|
 | `human` | Your display name for plain-shell posts, and the name workers are told is yours |
 
-`~/.chatter/` also holds `chatter.db` and one `<name>.log` per worker.
+`~/.chatter/` also holds `chatter.db`, `run/<repo>/<name>.pid`+`.topic`, and `logs/<repo>/<name>.log` per
+worker, each namespaced by repo (`_none` outside git) so two repos' workers never collide.
 
 ## Reference
 

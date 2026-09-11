@@ -12,29 +12,33 @@
 #        chatter-agent john --topic guide-invite  same, but only sees and wakes on that topic plus untagged messages
 #        --role NAME picks a role file from roles/ explicitly.
 #
-# Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
+# Output goes to the terminal and to ~/.chatter/logs/<repo>/<name>.log. Stop with Ctrl-C or:
+# pkill -f "chatter-agent john"
 set -uo pipefail
 
-# chatter-agent status: lists running workers, no worktree/session/role setup needed. Must be checked
-# before $1 is grabbed as a worktree dir/name below.
+# chatter-agent status: lists running workers across every repo on the box, no worktree/session/role
+# setup needed. Must be checked before $1 is grabbed as a worktree dir/name below.
 if [ "${1:-}" = status ]; then
-  run=~/.chatter/run
   found=0
-  for p in "$run"/*.pid; do
-    [ -f "$p" ] || continue
-    pid=$(cat "$p")
-    kill -0 "$pid" 2>/dev/null || { rm -f "$p" "$run/$(basename "$p" .pid).topic"; continue; }
-    found=1
-    name=$(basename "$p" .pid)
-    role=dev; [ "$name" = boss ] && role=boss
-    secs=$(( $(date +%s) - $(stat -f%m "$p" 2>/dev/null || stat -c %Y "$p") ))   # BSD stat, then GNU
-    if [ "$secs" -ge 3600 ]; then uptime="$((secs / 3600))h$(((secs % 3600) / 60))m"
-    else uptime="$((secs / 60))m"; fi
-    log=~/.chatter/$name.log
-    spend="0.00"
-    [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/^chatter-agent: session start/{s=0} /■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
-    topic=$(cat "$run/$name.topic" 2>/dev/null); topic=${topic:--}
-    echo "$name $role $uptime \$$spend $topic"
+  for repo_dir in ~/.chatter/run/*/; do
+    [ -d "$repo_dir" ] || continue
+    repo=$(basename "$repo_dir")
+    for p in "$repo_dir"*.pid; do
+      [ -f "$p" ] || continue
+      pid=$(cat "$p")
+      kill -0 "$pid" 2>/dev/null || { rm -f "$p" "$repo_dir$(basename "$p" .pid).topic"; continue; }
+      found=1
+      name=$(basename "$p" .pid)
+      role=dev; [ "$name" = boss ] && role=boss
+      secs=$(( $(date +%s) - $(stat -f%m "$p" 2>/dev/null || stat -c %Y "$p") ))   # BSD stat, then GNU
+      if [ "$secs" -ge 3600 ]; then uptime="$((secs / 3600))h$(((secs % 3600) / 60))m"
+      else uptime="$((secs / 60))m"; fi
+      log=~/.chatter/logs/$repo/$name.log
+      spend="0.00"
+      [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/^chatter-agent: session start/{s=0} /■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
+      topic=$(cat "$repo_dir$name.topic" 2>/dev/null); topic=${topic:--}
+      echo "$repo $name $role $uptime \$$spend $topic"
+    done
   done
   [ "$found" = 0 ] && echo "no workers"
   exit 0
@@ -81,11 +85,19 @@ else
 fi
 
 sid=$( (uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid) | tr '[:upper:]' '[:lower:]')   # Ubuntu may lack uuidgen
-log=~/.chatter/$name.log
 
-# One process per name. The pid file lets a boss (or you) kill a worker by name; the tree kill takes the
-# running claude turn and the tail down with it, so Ctrl-C or kill leaves nothing behind.
-run=~/.chatter/run; mkdir -p "$run"; pidfile=$run/$name.pid
+# One boss per repo is a promise, not a fact, unless run/log paths are namespaced by repo: otherwise a
+# second repo's boss collides with the first's pidfile and a same-named dev in another repo steps on its
+# log. cwd is already the repo (the worktree cd'd above, or the launching directory for a boss), so this
+# matches chatter's own repo_name(). No repo (outside git, or CHATTER_REPO=) buckets under a literal
+# '_none' so it can't collide with a real repo named that.
+repo=$(chatter whoami 2>/dev/null | sed -n 's/^repo: *//p')
+case $repo in '(none'*|'') repo=_none ;; esac
+log=~/.chatter/logs/$repo/$name.log; mkdir -p "$(dirname "$log")"
+
+# One process per name per repo. The pid file lets a boss (or you) kill a worker by name; the tree kill
+# takes the running claude turn and the tail down with it, so Ctrl-C or kill leaves nothing behind.
+run=~/.chatter/run/$repo; mkdir -p "$run"; pidfile=$run/$name.pid
 if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
   echo "chatter-agent: $name is already running (pid $(cat "$pidfile"))" >&2; exit 1
 fi
