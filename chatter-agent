@@ -54,10 +54,22 @@ if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
   echo "chatter-agent: $name is already running (pid $(cat "$pidfile"))" >&2; exit 1
 fi
 echo $$ >"$pidfile"
-killtree() { local c; for c in $(pgrep -P "$1"); do killtree "$c"; done; [ "$1" != "$$" ] && kill "$1" 2>/dev/null; }
-cleanup() { killtree $$; rm -f "$pidfile" ${fifo:+"$fifo"}; }
+killtree() {
+  [[ $1 =~ ^[0-9]+$ ]] || { echo "chatter-agent: killtree got a bad pid '$1'" >&2; return; }
+  local c; for c in $(pgrep -P "$1"); do killtree "$c"; done; [ "$1" != "$$" ] && kill "$1" 2>/dev/null
+}
+# Take the whole team down, three ways, because one has already failed in the wild:
+# the process group when this shell leads it (a terminal or & launch gives it its own), then devs this
+# boss spawned by their pid files, then whatever the tree walk still finds.
+spawned=""
+cleanup() {
+  trap '' TERM
+  [ "$(ps -o pgid= -p $$ | tr -d ' ')" = "$$" ] && kill -TERM -- -$$ 2>/dev/null
+  local n; for n in $spawned; do [ -f "$run/$n.pid" ] && kill "$(cat "$run/$n.pid")" 2>/dev/null; done
+  killtree $$; rm -f "$pidfile" ${fifo:+"$fifo"}
+}
 trap cleanup EXIT
-trap 'exit 143' TERM INT
+trap 'exit 143' TERM INT HUP
 human=$(jq -r '.human // "the user"' ~/.chatter/config.json 2>/dev/null || echo "the user")
 rolefile=$(sed -e "s/\$HUMAN/$human/g" -e "s/\$INTERVAL/$((interval / 60)) minutes/g" "$roles/$role.md")
 
@@ -114,6 +126,7 @@ if [ "$role" = boss ]; then
         # shellcheck disable=SC2086
         env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
         pending="$pending $name "     # wake the boss when this dev's introduction arrives, so it can assign
+        spawned="$spawned $name"
         say "status: spawned $name${flags:+ ($flags)}" ;;
       kill)
         if [ -f "$run/$name.pid" ]; then kill "$(cat "$run/$name.pid")" 2>/dev/null; say "status: killed $name"
