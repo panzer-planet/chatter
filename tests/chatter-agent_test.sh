@@ -193,6 +193,12 @@ assert_contains "wake_reason wakes on an @boss mention" "$out" "Someone mentione
 out=$(wake_reason "$(line "done" "done: foo.php sha1" dev1 zzz)" abc12345 "" "")
 assert_contains "wake_reason wakes on a done:" "$out" "A dev posted done:"
 
+out=$(wake_reason "$(line "done" "done: sha1, tested every branch incl. the @boss mention" dev1 zzz)" abc12345 "" "")
+assert_contains "wake_reason: a done: that says @boss in passing still gets the done: wake (reviewer line-up)" "$out" "A dev posted done:"
+
+out=$(wake_reason "$(line status "CI green on https://github.com/o/r/pull/1" boss abc12345)" abc12345 1 "")
+assert_contains "wake_reason: the verdict wake says not to announce kills (the loop confirms them)" "$out" "do not announce it yourself"
+
 out=$(wake_reason "$(line decision "decision: plan: x" dev1 zzz)" abc12345 "" "")
 assert_contains "wake_reason wakes on a decision:" "$out" "A stage transition was posted"
 
