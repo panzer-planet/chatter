@@ -8,6 +8,7 @@ usage: chatter post [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (read
        chatter read [--last N] [--since ID] [--unread] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
        chatter tail [--last N] [--topic NAME] [--repo NAME] [--json]   (follow live; --last 0 blocks until something new)
        chatter notify                                              (Claude Code PostToolUse hook; see README)
+       chatter whoami                                              (author, repo and topic a post from here would carry)
        chatter help | -h | --help                                  (works after any subcommand too)
 
        --unread  only messages since your last --unread; the cursor is stored per author name
@@ -217,6 +218,7 @@ match ($argv[1] ?? null) {
     'read' => read(array_slice($argv, 2)),
     'tail' => tail(array_slice($argv, 2)),
     'notify' => notify(),
+    'whoami' => printf("author: %s\nrepo:   %s\ntopic:  %s\n", author(), repo_name() ?? '(none, seen by everyone)', (getenv('CHATTER_TOPIC') ?: null) ?? '(none, seen by everyone)'),
     'help', '-h', '--help' => usage(0),
     default => usage(),
 };

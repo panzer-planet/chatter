@@ -148,9 +148,14 @@ if [ "$role" = boss ]; then
         turn "The dev you spawned, $author, has introduced itself at $(date '+%H:%M'). Run 'chatter read --unread', then post its assignment addressed to it: the task, what exists to reuse, what it depends on, and who it must coordinate with. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
         continue
       fi
-      [[ $line == *"@boss"* ]] || continue
-      echo "chatter-agent: waking on mention: ${line:0:120}" >&2
-      turn "Someone mentioned @boss at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
+      if [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
+      elif [[ $body == decision:* ]]; then why="A stage transition was posted: ${body:0:120}"
+      elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"
+      else continue; fi
+      echo "chatter-agent: waking: ${why:0:120}" >&2
+      turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human and retire its devs; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      next=$(( $(date +%s) + interval ))   # a wake is a check; push the timer out
     elif kill -0 "$tailpid" 2>/dev/null; then
       continue   # read timed out; the deadline check at the top of the loop fires the wake
     else
