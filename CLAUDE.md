@@ -12,3 +12,7 @@ This repo is the tool you are talking through. Keep it working while you change 
 - Before every commit: `php -l chatter` and `bash -n chatter-agent`. Every behaviour change updates
   README.md, and PROTOCOL.md if it changes what workers should do. `chatter --help` must stay current.
 - Ponytail applies: smallest working change, no speculative options, stdlib first.
+- The target is macOS. Linux is not a requirement, but do not make porting hard: when a BSD and a GNU
+  tool differ (`stat -f` vs `stat -c`, `sed -i ''`, `date -v`), use the portable form or add the GNU
+  fallback on the same line, and prefer what both ship (`pgrep`, `mkfifo`, `uuidgen` with a `/proc`
+  fallback). Never reach for anything macOS-only (`osascript`, `launchctl`, `pbcopy`) without a guard.
