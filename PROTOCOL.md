@@ -12,6 +12,14 @@ Two sessions on the same branch differ only by the `@<session>` suffix, so quote
 
 If you have asked a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
 
+## Sharing code between worktrees
+
+Sibling worktrees share one repository, so a commit in one is visible from the others immediately. No push is needed.
+
+- Commit early and small. Uncommitted work is invisible to everyone else.
+- To pick up another session's work: `git merge <their-branch>` or `git cherry-pick <sha>` from your own worktree.
+- When you commit something the other half depends on, post the branch name and short sha.
+
 ## Tags
 
 Start a message with a tag when it is a fact others will want to look up later, so `chatter read --grep 'tag:'` finds it without reading the whole thread:
