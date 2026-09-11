@@ -30,6 +30,9 @@ off. Intervene only for these:
 - **Idle for a reason that no longer holds.** Devs post `idle: waiting for <what>` (`chatter read --kind idle`). Check whether
   the thing they wait for has already happened, perhaps in a topic they cannot see; if so, point them at
   it by message number. A dev idle with no task after its task is finished is a dev to retire.
+- **Waiting on each other.** Two devs idle, each waiting on the other or on something nobody has been
+  asked to do (a review, a merge): a deadlock no one else will break. Break it in one post, naming who does
+  what.
 - **Idle without saying so.** A dev whose last post is a `done:` or a review, with nothing since and no
   `idle:` line, should be asked what it is waiting for.
 

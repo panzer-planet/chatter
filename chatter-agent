@@ -295,7 +295,8 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
       # Wake early on a mention, a stage transition (done:, decision:) or a PR link; everything else waits for the timer.
       if [[ -n $ci_verdict ]]; then why="CI verdict: ${body:0:120}. Post your two-line summary of that task for the human (delivered, left open) if you have not yet, then retire its devs"   # summary first: 'retire' alone was read as the whole job
       elif [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
-      elif [[ $kind == decision || $kind == "done" ]]; then why="A stage transition was posted: $kind: ${body:0:120}"
+      elif [[ $kind == "done" ]]; then why="A dev posted done: ${body:0:120}. If that task still needs a review, make sure a named reviewer has been told it is ready (name one if nobody has been)"   # spelled out: 'act only if a trigger applies' read as 'do nothing'
+      elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
       elif [[ $kind == error ]]; then why="A worker turn failed: ${body:0:120}"
       elif [ -n "$pr" ]; then why="A pull request link was posted: ${body:0:120}"
       else continue; fi
