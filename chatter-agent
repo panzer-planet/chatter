@@ -132,6 +132,7 @@ Act on anything one of your triggers applies to, including devs whose task is fi
 else
   intro="$intro Then stop."
 fi
+open_tail   # before the first turn: anything posted during it (a boss's own spawn: lines, a mention) waits in the fifo
 turn "$intro" --session-id "$sid" ${args[@]+"${args[@]}"}
 
 if [ "$role" = boss ]; then
@@ -173,7 +174,6 @@ ${failed:-$out}"
   }
   pending=" "
 
-  open_tail
   # Wall-clock timer. read -t restarts its countdown on every line, and a busy thread delivers lines
   # constantly, so the deadline is computed from the clock and each read only waits for what is left of it.
   next=$(( $(date +%s) + interval ))
@@ -219,7 +219,6 @@ else
   # Token discipline: skip messages the PostToolUse hook already delivered mid-turn (its cursor is in the db),
   # and put the message in the wake prompt so a "nothing for me" wake is one short reply with no tool calls.
   db=${CHATTER_DB:-$HOME/.chatter/chatter.db}; cursor="notify:${sid:0:8}"
-  open_tail
   while IFS= read -r line <&3; do
     [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
     case $(jq -r .kind <<<"$line") in status|idle) continue ;; esac   # narration informs but does not wake; the hook shows it on the next real turn
