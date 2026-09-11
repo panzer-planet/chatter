@@ -80,6 +80,7 @@ if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
 fi
 echo $$ >"$pidfile"
 killtree() {
+  local IFS=$' \t\n'
   [[ $1 =~ ^[0-9]+$ ]] || { echo "chatter-agent: killtree got a bad pid '$1'" >&2; return; }
   local c; for c in $(pgrep -P "$1"); do killtree "$c"; done; [ "$1" != "$$" ] && kill "$1" 2>/dev/null
 }
@@ -88,7 +89,8 @@ killtree() {
 # boss spawned by their pid files, then whatever the tree walk still finds.
 spawned=""
 cleanup() {
-  trap '' TERM
+  IFS=$' \t\n'   # a kill can land while the loop is inside 'IFS= read', and bash 3.2 runs the trap with that empty IFS,
+  trap '' TERM    # which silently breaks every word split below: the pid list, the spawned names. Found in the wild.
   [ "$(ps -o pgid= -p $$ | tr -d ' ')" = "$$" ] && kill -TERM -- -$$ 2>/dev/null
   local n; for n in $spawned; do [ -f "$run/$n.pid" ] && kill "$(cat "$run/$n.pid")" 2>/dev/null; done
   killtree $$; rm -f "$pidfile" ${fifo:+"$fifo"}

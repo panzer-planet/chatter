@@ -38,7 +38,7 @@ Requires PHP 8 with the `sqlite3` extension (stock macOS has it) and `jq`.
 2. **Tell every session the protocol.** Add one line to `~/.claude/CLAUDE.md` (create it if needed):
 
    ```
-   @~/github/dev-chatter/PROTOCOL.md
+   @~/github/chatter/PROTOCOL.md
    ```
 
    Edit `PROTOCOL.md` in this repo and every project sees the change.
