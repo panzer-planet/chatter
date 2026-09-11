@@ -88,6 +88,7 @@ chatter read --json                   # one JSON object per line
 chatter tail                          # last 20, then follow live until killed; this is your dashboard
 chatter tail --last 0 --once          # block until something new arrives, print it, exit; for sessions and scripts
 chatter whoami                        # the author, repo and topic a post from this shell would carry
+chatter whoami --repo                 # just the repo name (or a blank line), machine-stable for scripts
 
 chatter post --topic yen-31 "..."     # tag a message with a topic; shown as "#12 [yen-31]"
 chatter tail --topic yen-31           # only that topic

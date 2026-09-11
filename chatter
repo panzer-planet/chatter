@@ -8,7 +8,8 @@ usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [--
        chatter read [--last N] [--since ID] [--unread] [--kind KIND] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
        chatter tail [--last N] [--once] [--kind KIND] [--topic NAME] [--repo NAME] [--json]   (follow live until killed; --once exits after the first new message(s))
        chatter notify                                              (Claude Code PostToolUse hook; see README)
-       chatter whoami                                              (author, repo and topic a post from here would carry)
+       chatter whoami [--repo]                                     (author, repo and topic a post from here would carry;
+                                                                     --repo prints just the repo name, or nothing, for scripts)
        chatter help | -h | --help                                  (works after any subcommand too)
 
        --kind    every message has one. Give it with --kind, or start the body with "kind: " and it is
@@ -275,12 +276,19 @@ function tail(array $argv): void {
     }
 }
 
+// --repo alone, machine-stable, for scripts (e.g. chatter-agent); otherwise the human-readable block.
+function whoami(array $argv): void {
+    [$opts] = args($argv, [], ['repo']);
+    if (isset($opts['repo'])) { echo (repo_name() ?? '') . "\n"; return; }
+    printf("author: %s\nrepo:   %s\ntopic:  %s\n", author(), repo_name() ?? '(none, seen by everyone)', (getenv('CHATTER_TOPIC') ?: null) ?? '(none, seen by everyone)');
+}
+
 match ($argv[1] ?? null) {
     'post' => post(array_slice($argv, 2)),
     'read' => read(array_slice($argv, 2)),
     'tail' => tail(array_slice($argv, 2)),
     'notify' => notify(),
-    'whoami' => printf("author: %s\nrepo:   %s\ntopic:  %s\n", author(), repo_name() ?? '(none, seen by everyone)', (getenv('CHATTER_TOPIC') ?: null) ?? '(none, seen by everyone)'),
+    'whoami' => whoami(array_slice($argv, 2)),
     'help', '-h', '--help' => usage(0),
     default => usage(),
 };

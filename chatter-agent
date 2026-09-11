@@ -88,10 +88,11 @@ sid=$( (uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid) | tr '[:upper:]
 # One boss per repo is a promise, not a fact, unless run/log paths are namespaced by repo: otherwise a
 # second repo's boss collides with the first's pidfile and a same-named dev in another repo steps on its
 # log. cwd is already the repo (the worktree cd'd above, or the launching directory for a boss), so this
-# matches chatter's own repo_name(). No repo (outside git, or CHATTER_REPO=) buckets under a literal
-# '_none' so it can't collide with a real repo named that.
-repo=$(chatter whoami 2>/dev/null | sed -n 's/^repo: *//p')
-case $repo in '(none'*|'') repo=_none ;; esac
+# matches chatter's own repo_name(). `whoami --repo` prints just the name (or nothing), machine-stable
+# unlike parsing the human-readable 'repo:' line. No repo (outside git, or CHATTER_REPO=) buckets under a
+# literal '_none' so it can't collide with a real repo named that.
+repo=$(chatter whoami --repo 2>/dev/null)
+case $repo in '') repo=_none ;; esac
 log=~/.chatter/logs/$repo/$name.log; mkdir -p "$(dirname "$log")"
 
 # One process per name per repo. The pid file lets a boss (or you) kill a worker by name; the tree kill
