@@ -4,7 +4,7 @@
 
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
-usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (reads stdin if MESSAGE omitted)
+usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [--] [MESSAGE]   (reads stdin if MESSAGE omitted)
        chatter read [--last N] [--since ID] [--unread] [--kind KIND] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
        chatter tail [--last N] [--once] [--kind KIND] [--topic NAME] [--repo NAME] [--json]   (follow live until killed; --once exits after the first new message(s))
        chatter notify                                              (Claude Code PostToolUse hook; see README)
@@ -14,6 +14,8 @@ usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [ME
        --kind    every message has one. Give it with --kind, or start the body with "kind: " and it is
                  lifted out of the body. Any lowercase word; by convention: chat (default), status, claim,
                  done, decision, gotcha, question, spawn, kill. Filter with read/tail --kind KIND.
+       --reply-to must be the id of an existing message, or post is refused.
+       --        ends option parsing; use it so a MESSAGE that itself starts with "--" is not read as a flag.
        --unread  only messages since your last --unread; the cursor is stored per author name and repo
        --from    authors starting with NAME        --grep  messages containing TEXT (case-insensitive)
        --topic   only that topic. Without it, CHATTER_TOPIC (if set) selects that topic plus untagged messages.
@@ -91,12 +93,14 @@ function db(): SQLite3 {
 }
 
 // Parse argv into ['flag' => value, ...] plus positional args. An unknown flag is an error: taken as a boolean,
-// a typo like `post --topc tests MSG` would silently post "tests".
+// a typo like `post --topc tests MSG` would silently post "tests". A bare "--" ends option parsing, so a
+// message that itself starts with "--" can still be passed as an argument.
 function args(array $argv, array $valued, array $bool = []): array {
     $opts = []; $pos = [];
     for ($i = 0; $i < count($argv); $i++) {
         $a = $argv[$i];
         if ($a === '-h') usage(0);
+        if ($a === '--') { $pos = [...$pos, ...array_slice($argv, $i + 1)]; break; }
         if (!str_starts_with($a, '--')) { $pos[] = $a; continue; }
         $name = substr($a, 2);
         if ($name === 'help') usage(0);
@@ -161,7 +165,13 @@ function post(array $argv): void {
 
     $topic = ($opts['topic'] ?? getenv('CHATTER_TOPIC')) ?: null;   // --topic '' posts untagged even when CHATTER_TOPIC is set
     $repo = repo_name();
-    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, kind, body) VALUES (:a, :s, :r, :t, :p, :k, :b)');
+    $db = db();
+    if (isset($opts['reply-to'])) {
+        if (!preg_match('/^[0-9]+$/', $opts['reply-to']) || !$db->querySingle('SELECT 1 FROM messages WHERE id = ' . (int)$opts['reply-to'])) {
+            fwrite(STDERR, "chatter: --reply-to must be the id of an existing message, got '{$opts['reply-to']}'\n"); exit(1);
+        }
+    }
+    $st = $db->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, kind, body) VALUES (:a, :s, :r, :t, :p, :k, :b)');
     $st->bindValue(':k', $kind);
     $st->bindValue(':t', $topic, $topic === null ? SQLITE3_NULL : SQLITE3_TEXT);
     $st->bindValue(':p', $repo, $repo === null ? SQLITE3_NULL : SQLITE3_TEXT);

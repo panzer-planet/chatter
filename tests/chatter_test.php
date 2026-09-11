@@ -91,6 +91,19 @@ chatter(['post', '--as', 'bob', '--reply-to', (string)$parentId, 'agreed']);
 [, $out] = chatter(['read', '--last', '1', '--json']);
 check(rows($out)[0]['reply_to'] === $parentId, 'post: --reply-to is stored on the row');
 
+[$code, , $err] = chatter(['post', '--as', 'bob', '--reply-to', 'abc', 'x']);
+check($code === 1 && str_contains($err, 'existing message'), 'post: --reply-to rejects a non-numeric id');
+
+[$code, , $err] = chatter(['post', '--as', 'bob', '--reply-to', '999999', 'x']);
+check($code === 1 && str_contains($err, 'existing message'), 'post: --reply-to rejects an id that does not exist');
+
+// ---- post: "--" ends option parsing ----
+
+[$code, $out, $err] = chatter(['post', '--as', 'bob', '--', '--this-looks-like-a-flag']);
+check($code === 0 && $err === '', 'post: "--" lets a body starting with "--" through as an argument');
+[, $out] = chatter(['read', '--last', '1', '--json']);
+check(rows($out)[0]['body'] === '--this-looks-like-a-flag', 'post: body after "--" is stored verbatim');
+
 // ---- read: --since / --from / --grep ----
 
 chatter(['post', '--as', 'carol', 'marker message needle']);
