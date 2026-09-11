@@ -46,6 +46,18 @@ fi
 
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
 log=~/.chatter/$name.log
+
+# One process per name. The pid file lets a boss (or you) kill a worker by name; the tree kill takes the
+# running claude turn and the tail down with it, so Ctrl-C or kill leaves nothing behind.
+run=~/.chatter/run; mkdir -p "$run"; pidfile=$run/$name.pid
+if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+  echo "chatter-agent: $name is already running (pid $(cat "$pidfile"))" >&2; exit 1
+fi
+echo $$ >"$pidfile"
+killtree() { local c; for c in $(pgrep -P "$1"); do killtree "$c"; done; [ "$1" != "$$" ] && kill "$1" 2>/dev/null; }
+cleanup() { killtree $$; rm -f "$pidfile" ${fifo:+"$fifo"}; }
+trap cleanup EXIT
+trap 'exit 143' TERM INT
 human=$(jq -r '.human // "the user"' ~/.chatter/config.json 2>/dev/null || echo "the user")
 rolefile=$(sed -e "s/\$HUMAN/$human/g" -e "s/\$INTERVAL/$((interval / 60)) minutes/g" "$roles/$role.md")
 
@@ -67,7 +79,12 @@ show() {
 
 # turn PROMPT [claude flags...]. Prompt goes first because --allowedTools is variadic and would swallow it.
 # Defaults to Sonnet; a --model in the extra flags comes later on the command line and wins.
-turn() { claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show; }
+# Runs in the background and waits: bash defers signal traps while a foreground command runs, so a kill
+# during a turn would otherwise sit until the turn finished. wait is a builtin and is interrupted at once.
+turn() { ( claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show ) & wait $!; }
+
+# Same reason for the message loop: the tail runs behind a fifo and the loop uses the read builtin.
+open_tail() { fifo=$(mktemp -u); mkfifo "$fifo"; chatter tail --last 0 --json >"$fifo" & tailpid=$!; exec 3<"$fifo"; }
 
 turn "Your role:
 
@@ -79,12 +96,35 @@ if [ "$role" = boss ]; then
   # Timer-driven: silence is the main thing to notice, and a message-driven loop never fires on silence.
   # A message that mentions @boss wakes it early. Bash 3.2's read -t returns 1 on both timeout and EOF,
   # so the tail runs behind a fifo and its liveness tells the two apart.
-  fifo=$(mktemp -u); mkfifo "$fifo"
-  chatter tail --last 0 --json >"$fifo" & tailpid=$!
-  trap 'kill $tailpid 2>/dev/null; rm -f "$fifo"' EXIT
-  exec 3<"$fifo"
+  # Control messages. The boss's model has no shell for this; it posts "spawn: NAME [flags]" or "kill: NAME"
+  # and this loop, a long-lived process, does it. The same lines from the human (no session) are honoured too.
+  # Nobody else's are. Spawned devs are children of this process and die with it.
+  control() {  # $1 = message body
+    local verb=${1%%:*} rest=${1#*: } name flags
+    name=${rest%% *}; [[ $rest == *" "* ]] && flags=${rest#* } || flags=""
+    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { say "status: refused '$1': bad name"; return; }
+    case $verb in
+      spawn)
+        local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p"; done   # prune dead
+        if [ "$(ls "$run"/*.pid 2>/dev/null | wc -l)" -ge 5 ]; then say "status: refused spawn of $name: 4 devs already running"; return; fi
+        # shellcheck disable=SC2086
+        env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
+        say "status: spawned $name${flags:+ ($flags)}" ;;
+      kill)
+        if [ -f "$run/$name.pid" ]; then kill "$(cat "$run/$name.pid")" 2>/dev/null; say "status: killed $name"
+        else say "status: refused kill of $name: not running"; fi ;;
+    esac
+  }
+  say() { CLAUDE_CODE_SESSION_ID=$sid chatter post "$1" 2>/dev/null; echo "chatter-agent: $1" >&2; }
+
+  open_tail
   while true; do
     if IFS= read -r -t "$interval" line <&3; then
+      body=$(jq -r .body <<<"$line")
+      if [[ $body == spawn:\ * || $body == kill:\ * ]]; then
+        [[ $line == *"\"session\":\"${sid:0:8}\""* || $line == *"\"session\":\"\""* ]] && control "$body"
+        continue
+      fi
       [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
       [[ $line == *"@boss"* ]] || continue
       echo "chatter-agent: waking on mention: ${line:0:120}" >&2
@@ -99,7 +139,8 @@ else
   # Token discipline: skip messages the PostToolUse hook already delivered mid-turn (its cursor is in the db),
   # and put the message in the wake prompt so a "nothing for me" wake is one short reply with no tool calls.
   db=${CHATTER_DB:-$HOME/.chatter/chatter.db}; cursor="notify:${sid:0:8}"
-  chatter tail --last 0 --json | while IFS= read -r line; do
+  open_tail
+  while IFS= read -r line <&3; do
     [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
     [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
     id=$(jq -r .id <<<"$line")

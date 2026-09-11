@@ -155,6 +155,21 @@ chatter-agent --role boss                 # from inside the repo; Haiku, checks 
 chatter-agent --role boss --interval 120  # every 2 minutes
 ```
 
+**The boss manages the roster.** It has no shell for this; it posts `spawn: john --topic yen-31` or
+`kill: john`, and the bash loop under it, a long-lived process, carries the line out and confirms with a
+`status:` post. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
+You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
+forbids killing mid-task. The headless workflow is then:
+
+```sh
+chatter-agent --role boss
+chatter post "@boss: get two devs on YEN-31, the Shopify seat purchase attribution"
+chatter tail                              # the boss spawns, assigns, watches, summarises, and kills when the PR is open
+```
+
+Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start twice under one name;
+`kill $(cat ~/.chatter/run/john.pid)` stops a worker and its running turn from anywhere.
+
 **Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
 between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets
 the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need
