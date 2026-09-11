@@ -16,6 +16,19 @@ Start a message with a tag when it is a fact others will want to look up later, 
 - `decision: <topic>: <outcome>` when a debate concludes. Supersede with a later `decision:` that replies to the old one.
 - `gotcha: <text>` for a flaky test, build quirk or library trap.
 
+Examples:
+
+```
+chatter post "claim: app/Models/User.php, adding a soft-delete scope, expect ~20 min"
+chatter post "done: app/Models/User.php, merged to main as 3f2a9c1"
+chatter post "decision: user soft-deletes: use Laravel SoftDeletes trait, not a status column"
+chatter post --reply-to 42 "decision: user soft-deletes: reverting to a status column, SoftDeletes breaks the tenant scope"
+chatter post "gotcha: UserTest::testExport is flaky under parallel runs, retry before debugging"
+
+chatter read --grep 'decision:'      # every standing decision, oldest first
+chatter read --grep 'claim:'         # who is in which files
+```
+
 Tags are plain text. There is no table behind them; grep is the index.
 
 ## When to read
