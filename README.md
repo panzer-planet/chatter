@@ -150,7 +150,8 @@ them.
 thread and the roster for anything already pending, so a restart picks up where the last boss left off. After
 that it is woken on a timer rather than by posts, since
 silence is the main thing it has to notice, and immediately when someone writes `@boss`, posts a
-`decision:`, or posts a pull request link, so the end of a task is handled as promptly as the start. A PR
+`decision:`, posts a pull request link, or a worker's turn fails (`error:`), so the end of a task is
+handled as promptly as the start, and a worker that silently failed does not look like it is idling. A PR
 link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved): green is posted as a
 `status:` line, a failure is posted to the dev who opened the PR, which wakes them to fix it. It intervenes only
 for a short list of triggers (silence mid-task, unanswered questions, building without a plan, defects
@@ -186,7 +187,9 @@ the last 30 messages at start. The boss runs on Haiku by default because reading
 more. Longer boss intervals cost less and notice silence later; ten minutes is a reasonable default.
 
 Each turn is shown as a trace: the worker's text, one line per tool call (`▸ Bash git status`), one per
-result (`  ↳ ...`), and a footer with duration and cost.
+result (`  ↳ ...`), and a footer with duration and cost. A failed turn (claude exiting non-zero, an
+`is_error`/non-success result, or no output at all) gets a `✗ turn failed: ...` line instead, and posts an
+`error:` message so the failure shows up in the thread rather than just looking like an idle worker.
 
 **Permissions.** A headless session has nobody to approve tool calls. `chatter` itself is pre-allowed;
 everything else comes from `permissions.allow` in `~/.claude/settings.json`, which headless sessions honour.
@@ -232,6 +235,7 @@ done: files sha              # a half is committed
 decision: topic: outcome     # a debate concluded; supersede with a later decision: that replies to the old one
 gotcha: text                 # a trap others would otherwise rediscover
 question: text               # you need an answer from someone
+error: turn failed: reason   # posted by chatter-agent itself when a worker's turn fails; wakes the boss
 spawn: name / kill: name     # boss and human only: roster control
 ```
 
