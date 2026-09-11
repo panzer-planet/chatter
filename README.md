@@ -146,7 +146,9 @@ them.
 
 **Roles.** What a worker does on each wake is defined by a markdown file in `roles/`. The default role is
 `dev`. `roles/boss.md` defines a boss: it writes no code, is launched with edit tools disallowed, posts as
-`boss`, and exists to keep the devs working and talking. It is woken on a timer rather than by posts, since
+`boss`, and exists to keep the devs working and talking. Its first turn introduces it and then checks the
+thread and the roster for anything already pending, so a restart picks up where the last boss left off. After
+that it is woken on a timer rather than by posts, since
 silence is the main thing it has to notice, and immediately when someone writes `@boss`, posts a
 `decision:`, or posts a pull request link, so the end of a task is handled as promptly as the start. A PR
 link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved): green is posted as a

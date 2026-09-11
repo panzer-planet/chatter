@@ -102,11 +102,37 @@ open_tail() { fifo=$(mktemp -u); mkfifo "$fifo"; chatter tail --last 0 --json >"
 # this the first 'chatter read --unread' would return the entire thread.
 CLAUDE_CODE_SESSION_ID=$sid chatter read --unread >/dev/null 2>&1
 
-turn "Your role:
+# One line per running dev: name, minutes since its last post, and what that post was. Handed to the boss on
+# every timer tick so an idle check needs no tool calls and a kill decision rests on facts.
+roster() {
+  local p n last
+  for p in "$run"/*.pid; do
+    [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
+    kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
+    last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
+      '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
+    echo "- $n: ${last:-no posts yet}"
+  done
+}
+
+intro="Your role:
 
 $rolefile
 
-Post one line in chatter introducing yourself: your name, your role, the model you are running on, and that you are ready. Then stop." --session-id "$sid" ${args[@]+"${args[@]}"}
+Post one line in chatter introducing yourself: your name, your role, the model you are running on, and that you are ready."
+if [ "$role" = boss ]; then
+  # A boss may start into a thread that already needs it: an idle dev, an unanswered question, a PR with no
+  # summary. So its first turn is an introduction followed by a full check, not just a hello.
+  intro="$intro
+
+Then do a first check as if a timer had fired. The last 30 messages are in your context; run 'chatter read --kind idle --last 10' and 'chatter read --kind decision --last 10' for the current state, and 'chatter read --last 60' if the picture is unclear. Running devs:
+$(roster)
+
+Act on anything one of your triggers applies to, including devs whose task is finished. Then stop."
+else
+  intro="$intro Then stop."
+fi
+turn "$intro" --session-id "$sid" ${args[@]+"${args[@]}"}
 
 if [ "$role" = boss ]; then
   # Timer-driven: silence is the main thing to notice, and a message-driven loop never fires on silence.
@@ -134,18 +160,6 @@ if [ "$role" = boss ]; then
     esac
   }
   say() { CLAUDE_CODE_SESSION_ID=$sid chatter post "$1" 2>/dev/null; echo "chatter-agent: $1" >&2; }
-  # One line per running dev: name, minutes since its last post, and what that post was. Handed to the boss on
-  # every timer tick so an idle check needs no tool calls and a kill decision rests on facts.
-  roster() {
-    local p n last
-    for p in "$run"/*.pid; do
-      [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
-      kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
-      last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
-        '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
-      echo "- $n: ${last:-no posts yet}"
-    done
-  }
   # CI needs no model. When a PR link is posted, wait for its checks in the background and post the outcome:
   # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
   watch_ci() {  # $1 = PR url, $2 = author who posted it
