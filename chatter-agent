@@ -20,7 +20,7 @@ cd "$dir" || exit 1
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
 log=~/.chatter/$(basename "$dir").log
 echo "chatter-agent: $(basename "$dir") logging to $log"
-exec >>"$log" 2>&1
+if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >>"$log" 2>&1; fi   # terminal: show and log; background: log only
 
 # Headless sessions have nobody to approve tool calls, so chatter itself must be pre-allowed.
 # Anything else the worker needs (edits, git, tests) comes from the flags you pass, e.g.
