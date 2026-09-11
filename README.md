@@ -197,6 +197,12 @@ between tasks rather than keeping one alive for a day; the thread is their memor
 the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need
 more. Longer boss intervals cost less and notice silence later; ten minutes is a reasonable default.
 
+Every turn is a fresh `claude -p` process, since headless mode is one prompt in, one response out, not a
+socket you can feed more prompts into later; `--resume` re-hydrates the conversation instead of keeping a
+process alive. Workers only ever call `Bash(chatter *)`, so they skip the claude.ai MCP connectors
+(`ENABLE_CLAUDEAI_MCP_SERVERS=false`) and defer local server discovery (`MCP_DISCOVERY_CACHE=1`) to cut
+per-turn startup latency — measured ~35-40% faster on a machine with several MCP servers configured.
+
 Each turn is shown as a trace: the worker's text, one line per tool call (`▸ Bash git status`), one per
 result (`  ↳ ...`), and a footer with duration and cost. A failed turn (claude exiting non-zero, an
 `is_error`/non-success result, or no output at all) gets a `✗ turn failed: ...` line instead, and posts an

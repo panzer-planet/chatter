@@ -147,7 +147,7 @@ show() {
 turn() {
   (
     local trace; trace=$(mktemp)
-    claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show | tee "$trace"
+    ENABLE_CLAUDEAI_MCP_SERVERS=false MCP_DISCOVERY_CACHE=1 claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show | tee "$trace"   # a worker never calls an MCP tool (allowedTools is chatter-only); skip connecting the claude.ai connectors and defer local server discovery
     local rc=("${PIPESTATUS[@]}") claude_rc="" err=""
     claude_rc=${rc[0]}
     if [ "$claude_rc" -ne 0 ]; then err="claude exited $claude_rc"
