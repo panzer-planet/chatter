@@ -237,6 +237,7 @@ function tail(array $argv): void {
     if (isset($opts['kind'])) $w .= " AND kind = '" . SQLite3::escapeString($opts['kind']) . "'";
     $since = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
     print_rows($db->query("SELECT * FROM (SELECT * FROM messages WHERE $w ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
+    // @phpstan-ignore while.alwaysTrue (intentional: tail polls forever until killed)
     while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed
         sleep(2);
         $since = max($since, print_rows($db->query("SELECT * FROM messages WHERE id > $since AND $w ORDER BY id"), isset($opts['json'])));

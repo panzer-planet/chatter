@@ -176,6 +176,7 @@ roster() {
   for p in "$run"/*.pid; do
     [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
     kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
+    # shellcheck disable=SC1007  # CHATTER_TOPIC= clears the env var on purpose, not a typo for CHATTER_TOPIC=chatter
     last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
       '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
     echo "- $n: ${last:-no posts yet}"
@@ -216,7 +217,7 @@ if [ "$role" = boss ]; then
     case $verb in
       spawn)
         local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p" "$run/$(basename "$p" .pid).topic"; done   # prune dead
-        if [ "$(ls "$run"/*.pid 2>/dev/null | wc -l)" -ge 5 ]; then say "status: refused spawn of $name: 4 devs already running"; return; fi
+        if [ "$(find "$run" -maxdepth 1 -name '*.pid' 2>/dev/null | wc -l)" -ge 5 ]; then say "status: refused spawn of $name: 4 devs already running"; return; fi
         # shellcheck disable=SC2086
         env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
         pending="$pending $name "     # wake the boss when this dev's introduction arrives, so it can assign
@@ -232,8 +233,8 @@ if [ "$role" = boss ]; then
   # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
   watch_ci() {  # $1 = PR url, $2 = author who posted it
     [ -n "$1" ] || return
-    ( out=$(gh pr checks "$1" --watch 2>&1); rc=$?
-      if [ $rc -eq 0 ]; then say "status: CI green on $1"
+    ( out=$(gh pr checks "$1" --watch 2>&1); ci_rc=$?
+      if [ $ci_rc -eq 0 ]; then say "status: CI green on $1"
       elif grep -q 'no checks reported' <<<"$out"; then say "status: no CI configured for $1, skipping"
       else failed=$(awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' <<<"$out" | head -8)
         say "@$2: CI is not green on $1. Fix it, push, and post when it is.
