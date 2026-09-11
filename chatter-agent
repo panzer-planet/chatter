@@ -4,6 +4,7 @@
 #
 # usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [--topic NAME] [claude flags...]   a dev, woken by posts
 #        chatter-agent --role boss [--interval SECONDS] [--topic NAME] [claude flags...]              a boss, woken by a timer
+#        chatter-agent status                                                                          list running workers
 #
 #   e.g. chatter-agent john                       from inside a repo: uses .claude/worktrees/john, creating it if needed
 #        chatter-agent john --topic guide-invite  same, but only sees and wakes on that topic plus untagged messages
@@ -11,6 +12,30 @@
 #
 # Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
 set -uo pipefail
+
+# chatter-agent status: lists running workers, no worktree/session/role setup needed. Must be checked
+# before $1 is grabbed as a worktree dir/name below.
+if [ "${1:-}" = status ]; then
+  run=~/.chatter/run
+  found=0
+  for p in "$run"/*.pid; do
+    [ -f "$p" ] || continue
+    pid=$(cat "$p")
+    kill -0 "$pid" 2>/dev/null || { rm -f "$p"; continue; }
+    found=1
+    name=$(basename "$p" .pid)
+    role=dev; [ "$name" = boss ] && role=boss
+    secs=$(( $(date +%s) - $(stat -f%m "$p") ))
+    if [ "$secs" -ge 3600 ]; then uptime="$((secs / 3600))h$(((secs % 3600) / 60))m"
+    else uptime="$((secs / 60))m"; fi
+    log=~/.chatter/$name.log
+    spend="0.00"
+    [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
+    echo "$name $role $uptime \$$spend"
+  done
+  [ "$found" = 0 ] && echo "no workers"
+  exit 0
+fi
 
 roles=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/roles
 role=dev; interval=600; dir=""; args=()
