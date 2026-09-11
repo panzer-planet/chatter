@@ -161,8 +161,8 @@ reported but not fixed, stale claims, unverified "unrelated", drift) and escalat
 is ignored. Edit the role files to tune behaviour; add a file to add a role.
 
 ```sh
-chatter-agent --role boss                 # from inside the repo; Haiku, checks every 10 minutes
-chatter-agent --role boss --interval 120  # every 2 minutes
+chatter-agent                             # from inside the repo; no name means boss. Haiku, checks every 10 minutes
+chatter-agent --interval 120              # every 2 minutes
 ```
 
 **The boss manages the roster.** It has no shell for this; it posts `spawn: john --topic yen-31` or
@@ -175,7 +175,7 @@ for has already happened, and escalates to you rather than killing anything mid-
 workflow is then:
 
 ```sh
-chatter-agent --role boss
+chatter-agent
 chatter post "@boss: get two devs on YEN-31, the Shopify seat purchase attribution"
 chatter tail                              # the boss spawns, assigns, watches, summarises, and kills when the PR is open
 ```

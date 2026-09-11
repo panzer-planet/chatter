@@ -2,13 +2,15 @@
 # chatter-agent: a Claude Code session that nobody types into. It talks through chatter and is woken
 # for a turn when there is something to react to. What it does on a wake is defined by its role file.
 #
-# usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [--topic NAME] [claude flags...]   a dev, woken by posts
-#        chatter-agent --role boss [--interval SECONDS] [--topic NAME] [claude flags...]              a boss, woken by a timer
-#        chatter-agent status                                                                          list running workers
+# usage: chatter-agent [--interval SECONDS] [--topic NAME] [claude flags...]                         a boss, woken by a timer
+#        chatter-agent <worktree-dir | worktree-name> [--topic NAME] [claude flags...]               a dev, woken by posts
+#        chatter-agent status                                                                        list running workers
 #
-#   e.g. chatter-agent john                       from inside a repo: uses .claude/worktrees/john, creating it if needed
+#   No name means boss: you start one boss per repo and it spawns the devs. A name makes a dev.
+#   e.g. chatter-agent                            from inside a repo: watches the devs, posts as "boss"
+#        chatter-agent john                       from inside a repo: uses .claude/worktrees/john, creating it if needed
 #        chatter-agent john --topic guide-invite  same, but only sees and wakes on that topic plus untagged messages
-#        chatter-agent --role boss                from inside a repo: watches the devs, posts as "boss"
+#        --role NAME picks a role file from roles/ explicitly.
 #
 # Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
 set -uo pipefail
@@ -38,7 +40,7 @@ if [ "${1:-}" = status ]; then
 fi
 
 roles=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/roles
-role=dev; interval=600; dir=""; args=()
+role=""; interval=600; dir=""; args=()
 [[ $# -gt 0 && $1 != --* ]] && { dir=$1; shift; }
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -48,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     *) args+=("$1"); shift ;;
   esac
 done
+[ -n "$role" ] || { [ -n "$dir" ] && role=dev || role=boss; }   # a name makes a dev; nothing makes a boss
 [ -f "$roles/$role.md" ] || { echo "chatter-agent: unknown role '$role' (no $roles/$role.md)" >&2; exit 1; }
 
 if [ "$role" = boss ]; then
@@ -56,7 +59,7 @@ if [ "$role" = boss ]; then
   args=(--model haiku ${args[@]+"${args[@]}"})  # reading and nudging is Haiku work; a later --model from you still wins
   args+=(--disallowedTools Edit Write MultiEdit NotebookEdit)   # no hands: the thread is its only tool
 else
-  [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [claude flags...]" >&2; exit 1; }
+  [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]   (no name starts a boss)" >&2; exit 1; }
   if [ ! -d "$dir" ]; then
     name=$dir; dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$name"
     if [ ! -d "$dir" ]; then  # create it, branching from HEAD; reuse the branch if it already exists
