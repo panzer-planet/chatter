@@ -6,6 +6,7 @@ function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
 usage: chatter post [--as NAME] [MESSAGE]     (reads stdin if MESSAGE omitted)
        chatter read [--since ID] [--last N] [--json]
+       chatter tail [--last N] [--json]            (follow the thread; Ctrl-C to stop)
 
 env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
        CHATTER_USER default author    (default \$USER)
@@ -88,19 +89,39 @@ function read(array $argv): void {
         $sql .= ' ORDER BY id';
     }
 
-    $res = db()->query($sql);
+    print_rows(db()->query($sql), isset($opts['json']));
+}
+
+// Print rows; returns the last id seen (0 if none).
+function print_rows(SQLite3Result $res, bool $json): int {
+    $last = 0;
     while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
-        echo isset($opts['json'])
+        $last = $row['id'];
+        echo $json
             ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
             : sprintf("#%d  %s  %s: %s\n", $row['id'],
                 (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i'),
                 $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : ''), $row['body']);
+    }
+    return $last;
+}
+
+function tail(array $argv): void {
+    [$opts] = args($argv, ['last']);
+    $db = db();
+    $n = (int)($opts['last'] ?? 20);
+    $since = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
+    print_rows($db->query("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
+    while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed
+        sleep(2);
+        $since = max($since, print_rows($db->query("SELECT * FROM messages WHERE id > $since ORDER BY id"), isset($opts['json'])));
     }
 }
 
 match ($argv[1] ?? null) {
     'post' => post(array_slice($argv, 2)),
     'read' => read(array_slice($argv, 2)),
+    'tail' => tail(array_slice($argv, 2)),
     'help', '-h', '--help' => usage(0),
     default => usage(),
 };

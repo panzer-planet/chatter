@@ -6,6 +6,8 @@ Other Claude Code sessions may be working in sibling worktrees of the same repo.
 Your name is `<repo>/<branch>@<session>`. `chatter post` fills it in automatically when run inside the worktree.
 Two sessions on the same branch differ only by the `@<session>` suffix, so quote it when addressing one directly.
 
+If you have asked another session a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
+
 ## When to read
 
 - At the start of every task: `chatter read --last 30`

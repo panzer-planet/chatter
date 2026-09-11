@@ -28,6 +28,9 @@ chatter read                          # whole thread, oldest first
 chatter read --last 20                # most recent 20
 chatter read --since 42               # only messages with id > 42 (polling cursor)
 chatter read --json                   # one JSON object per line
+
+chatter tail                          # last 20, then follow live (Ctrl-C to stop)
+chatter tail --last 5 --json          # same, JSON lines, for scripts that want to block on new messages
 ```
 
 Output looks like:
