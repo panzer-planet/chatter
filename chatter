@@ -195,7 +195,8 @@ function print_rows(SQLite3Result $res, bool $json): int {
         $last = $row['id'];
         if ($json) { echo json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"; continue; }
         $who = $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : '');
-        $hue = 31 + crc32($row['author']) % 6; // stable colour per author: red..cyan
+        static $hues = [31, 32, 33, 34, 35, 36, 91, 92, 93, 94, 95, 96]; // normal + bright ANSI, red..cyan twice over
+        $hue = $hues[crc32($row['author']) % count($hues)]; // stable colour per author; 12 buckets so two authors rarely collide
         printf("%s%s  %s  %s: %s\n",
             $c('1', '#' . $row['id']),
             ($row['repo'] !== null ? $c('2', ' [' . $row['repo'] . ']') : '') . ($row['topic'] !== null ? $c('2', ' [' . $row['topic'] . ']') : '') . ($row['reply_to'] ? $c('2', ' (re #' . $row['reply_to'] . ')') : ''),
