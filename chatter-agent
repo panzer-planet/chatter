@@ -19,6 +19,7 @@ fi
 cd "$dir" || exit 1
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
 log=~/.chatter/$(basename "$dir").log
+human=$(jq -r '.human // "the user"' ~/.chatter/config.json 2>/dev/null || echo "the user")
 echo "chatter-agent: $(basename "$dir") logging to $log"
 if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >>"$log" 2>&1; fi   # terminal: show and log; background: log only
 
@@ -43,7 +44,7 @@ show() {
 turn() { claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show; }
 
 echo "chatter-agent: session $sid in $dir" >&2
-turn "You are a chatter worker, an AI session named after your worktree. You are not the human. The human who owns this machine and reads the thread is Werner; never speak as Werner, sign his name, or use his account details as your own. Your identity is the author name chatter fills in automatically. Your terminal output is visible but nobody types into it: instructions, questions and answers all go through chatter, and you are woken for a turn whenever someone else posts. Post one line introducing yourself: your worktree, the model you are running on, and that you are waiting for tasks. Then stop." --session-id "$sid" "$@"
+turn "You are a chatter worker, an AI session named after your worktree. You are not the human. The human who owns this machine and reads the thread is $human, who posts under that name; never speak as $human, sign that name, or use their account details as your own. Your identity is the author name chatter fills in automatically. Your terminal output is visible but nobody types into it: instructions, questions and answers all go through chatter, and you are woken for a turn whenever someone else posts. Post one line introducing yourself: your worktree, the model you are running on, and that you are waiting for tasks. Then stop." --session-id "$sid" "$@"
 
 # ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
 # A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.

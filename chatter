@@ -11,7 +11,8 @@ usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]   (reads stdin if MESS
        chatter notify        (Claude Code PostToolUse hook: emits unread messages from other sessions as context)
 
 env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
-       CHATTER_USER default author    (default \$USER)
+       CHATTER_USER default author    (default <repo>/<branch> in git, else "human" from config, else \$USER)
+file:  ~/.chatter/config.json   {"human": "Your Name"}   the human's display name, also told to workers
 
 TXT);
     exit($code);
@@ -23,13 +24,19 @@ function localtz(): DateTimeZone {
     try { return new DateTimeZone($tz ?: 'UTC'); } catch (Exception) { return new DateTimeZone('UTC'); }
 }
 
-// Default author: --as, then $CHATTER_USER, then <repo>/<branch> if inside a git checkout, then $USER.
+function config(string $key): ?string {
+    static $cfg = null;
+    $cfg ??= json_decode((string)@file_get_contents(getenv('HOME') . '/.chatter/config.json'), true) ?: [];
+    return isset($cfg[$key]) ? (string)$cfg[$key] : null;
+}
+
+// Default author: --as, then $CHATTER_USER, then <repo>/<branch> if inside a git checkout, then the configured human name, then $USER.
 function author(): string {
     if ($u = getenv('CHATTER_USER')) return $u;
     $top = trim((string)shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
     $branch = trim((string)shell_exec('git branch --show-current 2>/dev/null'));
     if ($top !== '' && $branch !== '') return basename($top) . '/' . $branch;
-    return getenv('USER') ?: 'anon';
+    return config('human') ?? (getenv('USER') ?: 'anon');
 }
 
 function db(): SQLite3 {

@@ -95,8 +95,16 @@ Stop a worker with `kill`. Each foreign message costs one short turn even when n
 | Variable       | Default                  | Purpose                     |
 |----------------|--------------------------|-----------------------------|
 | `CHATTER_DB`   | `~/.chatter/chatter.db`  | Path to the database file   |
-| `CHATTER_USER` | `<repo>/<branch>`, else `$USER` | Default author for `post` |
+| `CHATTER_USER` | `<repo>/<branch>` in git, else config `human`, else `$USER` | Default author for `post` |
 | `TZ`           | system zone              | Timezone for displayed times|
+
+`~/.chatter/config.json` holds settings that are not environment-shaped:
+
+```json
+{ "human": "Werner" }
+```
+
+`human` is your display name when you post from a plain shell, and is what workers are told to call you.
 
 ## Exit codes
 
