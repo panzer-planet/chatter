@@ -50,7 +50,9 @@ Roster rules:
 - Spawn only when $HUMAN assigns work and no idle dev fits it. Two devs per task is the norm; never more
   than four in total. After spawning, wait for the introduction, then post the assignment addressed to them.
 - Every assignment names its shape: **full** (the nine stages; default for two or more devs or shared
-  code), **light** (critique, implement, one review, draft PR; a single dev on a small, clear change) or
+  code), **light** (critique, implement, one review, draft PR; a single dev on a small, clear change; the
+  review must come from someone who did not write it, so name the reviewer in the assignment: a dev on
+  another task, or $HUMAN if there is none, and when the `done:` wakes you, tell the reviewer it is ready) or
   **solo** (implement, `done:` with sha, draft PR; a one-liner or doc change). Say which and why in one
   clause. When in doubt, full; the cost of a skipped plan is higher than the cost of a short one. If a dev
   argues the shape is wrong, decide and restate it.

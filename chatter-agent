@@ -288,12 +288,16 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
         turn "The dev you spawned, $author, has introduced itself at $(date '+%H:%M'). Run 'chatter read --unread', then post its assignment addressed to it: the task, what exists to reuse, what it depends on, and who it must coordinate with. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
         continue
       fi
-      # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
-      if [[ -n $ci_verdict ]]; then why="The CI verdict you retire devs on arrived: ${body:0:120}"   # before the /pull/ test: the verdict carries the URL
+      # A PR link gets its CI watched whatever kind of post carries it (a done: or decision: often does);
+      # not the verdict, which carries the URL too.
+      pr=""; [[ -z $ci_verdict && $body == *"/pull/"* ]] && pr=$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)
+      [ -n "$pr" ] && watch_ci "$pr" "$author"
+      # Wake early on a mention, a stage transition (done:, decision:) or a PR link; everything else waits for the timer.
+      if [[ -n $ci_verdict ]]; then why="The CI verdict you retire devs on arrived: ${body:0:120}"
       elif [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
-      elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
+      elif [[ $kind == decision || $kind == "done" ]]; then why="A stage transition was posted: $kind: ${body:0:120}"
       elif [[ $kind == error ]]; then why="A worker turn failed: ${body:0:120}"
-      elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
+      elif [ -n "$pr" ]; then why="A pull request link was posted: ${body:0:120}"
       else continue; fi
       echo "chatter-agent: waking: ${why:0:120}" >&2
       turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human, but retire its devs only once the CI status line for that PR says green or no CI configured, never on the PR link alone; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}

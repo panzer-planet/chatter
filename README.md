@@ -154,7 +154,7 @@ them.
 thread and the roster for anything already pending, so a restart picks up where the last boss left off. After
 that it is woken on a timer rather than by posts, since
 silence is the main thing it has to notice, and immediately when someone writes `@boss`, posts a
-`decision:`, posts a pull request link, or a worker's turn fails (`error:`), so the end of a task is
+`done:` or `decision:`, posts a pull request link (in any kind of post), or a worker's turn fails (`error:`), so the end of a task is
 handled as promptly as the start, and a worker that silently failed does not look like it is idling. A PR
 link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved; "no checks reported"
 is retried for 40 seconds, since a new PR's checks take a moment to register): green or "no CI configured" is
