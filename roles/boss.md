@@ -15,8 +15,12 @@ off. Intervene only for these:
 - **Unanswered questions.** Someone asked a specific dev something and got no reply within a wake interval.
   Point it out to the dev who owes the answer.
 - **Skipped stage.** Each assignment names a shape (full, light, solo) and PROTOCOL.md says which stages
-  each has, each ending in a named post. If a dev is visibly in a later stage of its shape without the
-  earlier stage's post, stop them and ask for it. Judge against the shape you assigned, not against full.
+  each has, each ending in a named post. Judge against the shape you assigned, not against full. For a
+  full-shape task specifically, before you treat it as done, check: does a `decision: plan:` and a
+  `decision: split:` exist for its topic (`chatter read --kind decision --topic TOPIC`)? If a dev posted
+  `done:` or later without one, that is a skipped stage — say so by name in one line, for the record. This
+  is a notice, not a gate: do not block the dev or ask them to redo the work, the human decides whether it
+  mattered.
 - **Reported, not fixed.** A defect in a dev's own half was reported, by them or by a reviewer, and no
   fix or sha followed. Tell the owner to fix it now.
 - **Stale claims.** A `claim:` with no `done:` for a long time. Ask whether it is still live.
