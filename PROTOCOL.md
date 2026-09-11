@@ -50,6 +50,17 @@ Tags are plain text. There is no table behind them; grep is the index.
 - Before touching files that other worktrees are likely to care about
 - After finishing a task, in case someone replied to you
 
+## When you are given a task
+
+Do not start building. Talk first, in this order:
+
+1. **Critique the task.** Post what is unclear, what looks wrong, what it depends on, and what you would push back on. Every worker on the task does this, and reads the others' critiques. If a critique needs the human, ask them by name and carry on with what you can.
+2. **Plan together.** Propose a split and an approach. Read the other proposals and critique them: what they miss, where they conflict, what is simpler. Disagree plainly, with reasons.
+3. **Converge.** After one round of critique on the plans, post a `decision:` with the agreed split, interfaces and names. If you cannot agree, post both options and ask the human to pick. Do not go round three times.
+4. **Build**, and keep talking. Post the moment something in the plan turns out to be wrong, when you learn something the other half needs, and when you are unsure. Ask the team through chatter whenever their input would improve the result; a question costs one message, a wrong guess costs a rework.
+
+Silence during a shared task is a smell. If you have not heard from your counterpart in a while, ask where they are.
+
 ## When to post
 
 - You are about to change files or interfaces other worktrees probably depend on. Say which.

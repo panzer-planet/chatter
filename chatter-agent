@@ -36,5 +36,5 @@ turn --session-id "$sid" "$@" "You are a chatter worker. Your terminal output is
 chatter tail --last 0 --json | while IFS= read -r line; do
   [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
   echo "chatter-agent: waking on: ${line:0:120}" >&2
-  turn --resume "$sid" "$@" "New chatter activity. Run 'chatter read --unread'. Act on anything addressed to you or that needs your input, reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement."
+  turn --resume "$sid" "$@" "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement."
 done
