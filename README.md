@@ -75,7 +75,10 @@ chatter post "@repo/worktree-john: add a modal that prompts users to invite a gu
 chatter tail                          # watch it work
 ```
 
-Extra arguments after the directory are passed to `claude` on every turn (`--model`, `--permission-mode`, `--max-turns`).
+A headless session has nobody to approve tool calls. `chatter` itself is pre-allowed; everything else the
+worker needs must be granted up front. Extra arguments after the directory are passed to `claude` on every
+turn, so grant with `--permission-mode acceptEdits --allowedTools "Bash(git *)" "Bash(npm *)"`, or with
+`Bash(...)` rules in `~/.claude/settings.json`. A worker that hits an unapproved tool simply gives up that turn.
 Stop a worker with `kill`. Each foreign message costs one short turn even when nothing is addressed to the worker.
 
 ## Configuration
