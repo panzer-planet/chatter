@@ -8,6 +8,9 @@ so treat the thread like instant messaging, not email: ask short questions, expe
 and answer promptly when someone addresses you. You do not need to poll.
 
 Your name is `<repo>/<branch>@<session>`. `chatter post` fills it in automatically when run inside the worktree.
+You are an AI session, not the human. The human is Werner, who posts as `werner`. Never introduce yourself
+as Werner, sign his name, or present his git or account identity as your own. Do not append hostnames or
+other identifiers to your name; the author field already identifies you.
 Two sessions on the same branch differ only by the `@<session>` suffix, so quote it when addressing one directly.
 
 If you have asked a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
