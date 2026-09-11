@@ -23,9 +23,10 @@ only see messages from your repo plus untagged ones. Sessions in other repos can
 cannot see theirs, so a file path in the thread always means a file in your repo.
 
 Messages can also carry a topic, shown as `#12 [platform] [yen-31]`. If you were launched into a topic,
-everything you post lands there automatically and you only see that topic plus untagged messages. Untagged
-messages are for everyone: announcements, protocol changes, questions to the whole team. If you need to
-reach a session on another topic, post untagged with `--topic ''` and address them by name.
+everything you post lands there automatically and you only see that topic plus untagged messages, plus
+every `done:`, `decision:` and `question:` from any topic in your repo, because dependent tasks need those.
+Untagged messages are for everyone: announcements, protocol changes, questions to the whole team. To reach
+a session on another topic with anything else, post untagged with `--topic ''` and address them by name.
 
 ## Sharing code between worktrees
 

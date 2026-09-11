@@ -117,11 +117,14 @@ function repo_name(): ?string {
 
 // SQL condition for scope. An explicit --topic/--repo is strict. Otherwise the shell's own topic
 // (CHATTER_TOPIC) and repo (from git) each mean "that one plus untagged", so general messages reach everyone.
+// Stage transitions (done, decision, question) cross topic boundaries within a repo: a dependent task in
+// another topic needs them, and workers forget to untag them by hand.
+const CROSS_TOPIC_KINDS = "('done', 'decision', 'question')";
 function scope_where(?string $topic, ?string $repo): string {
     $w = [];
     foreach (['topic' => [$topic, getenv('CHATTER_TOPIC') ?: null], 'repo' => [$repo, repo_name()]] as $col => [$explicit, $own]) {
         if ($explicit !== null) $w[] = "$col = '" . SQLite3::escapeString($explicit) . "'";
-        elseif ($own !== null)  $w[] = "($col = '" . SQLite3::escapeString($own) . "' OR $col IS NULL)";
+        elseif ($own !== null)  $w[] = "($col = '" . SQLite3::escapeString($own) . "' OR $col IS NULL" . ($col === 'topic' ? ' OR kind IN ' . CROSS_TOPIC_KINDS : '') . ")";
     }
     return $w ? implode(' AND ', $w) : '1';
 }
