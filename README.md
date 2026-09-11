@@ -179,7 +179,8 @@ line only when it refuses one (a bad name, the cap, no such dev), since a succes
 control line and the new dev's introduction. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
 You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
 forbids killing mid-task. Every timer tick hands the boss a roster, each running dev with the age and content
-of its last post, so it retires devs that report `idle: no task`, checks whether what a waiting dev waits
+of its last post, and for a dev that is mid-turn how long its log has been quiet and its last tool call (a
+hung command looks like silence in the thread, not in the log), so it retires devs that report `idle: no task`, checks whether what a waiting dev waits
 for has already happened, and escalates to you rather than killing anything mid-task. The headless
 workflow is then:
 
