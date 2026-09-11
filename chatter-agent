@@ -121,6 +121,17 @@ if [ "$role" = boss ]; then
     esac
   }
   say() { CLAUDE_CODE_SESSION_ID=$sid chatter post "$1" 2>/dev/null; echo "chatter-agent: $1" >&2; }
+  # CI needs no model. When a PR link is posted, wait for its checks in the background and post the outcome:
+  # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
+  watch_ci() {  # $1 = PR url, $2 = author who posted it
+    [ -n "$1" ] || return
+    ( out=$(gh pr checks "$1" --watch 2>&1); rc=$?
+      if [ $rc -eq 0 ]; then say "status: CI green on $1"
+      else failed=$(awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' <<<"$out" | head -8)
+        say "@$2: CI is not green on $1. Fix it, push, and post when it is.
+${failed:-$out}"
+      fi ) &
+  }
   pending=" "
 
   open_tail
@@ -151,7 +162,7 @@ if [ "$role" = boss ]; then
       # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
       if [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
       elif [[ $body == decision:* ]]; then why="A stage transition was posted: ${body:0:120}"
-      elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"
+      elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
       else continue; fi
       echo "chatter-agent: waking: ${why:0:120}" >&2
       turn "$why (at $(date '+%H:%M')). Run 'chatter read --unread' and act according to your role: if a task just reached review-ready or a PR, post your summary for the human and retire its devs; otherwise act only if a trigger applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
