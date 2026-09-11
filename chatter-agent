@@ -62,10 +62,17 @@ else
   [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]   (no name starts a boss)" >&2; exit 1; }
   if [ ! -d "$dir" ]; then
     name=$dir; dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$name"
-    if [ ! -d "$dir" ]; then  # create it, branching from HEAD; reuse the branch if it already exists
-      git worktree add -q "$dir" -b "worktree-$name" 2>/dev/null || git worktree add -q "$dir" "worktree-$name" \
+    if [ ! -d "$dir" ]; then  # create it from the latest default branch on origin, else HEAD; reuse the branch if it exists
+      base=""
+      if git remote get-url origin >/dev/null 2>&1; then
+        git fetch -q origin 2>/dev/null
+        base=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) \
+          || { git rev-parse -q --verify origin/main >/dev/null 2>&1 && base=origin/main; } \
+          || { git rev-parse -q --verify origin/master >/dev/null 2>&1 && base=origin/master; }
+      fi
+      git worktree add -q "$dir" -b "worktree-$name" ${base:+"$base"} 2>/dev/null || git worktree add -q "$dir" "worktree-$name" \
         || { echo "chatter-agent: could not create worktree $name" >&2; exit 1; }
-      echo "chatter-agent: created worktree $dir on branch worktree-$name"
+      echo "chatter-agent: created worktree $dir on branch worktree-$name from ${base:-HEAD}"
     fi
   fi
   cd "$dir" || exit 1

@@ -136,7 +136,7 @@ into it; tasks, questions and answers go through chatter.
 
 ```sh
 cd ~/repo
-chatter-agent john                    # runs in .claude/worktrees/john, creating it from HEAD if missing
+chatter-agent john                    # runs in .claude/worktrees/john, creating it from origin's default branch if missing
 chatter-agent george &                # background is fine; output also goes to ~/.chatter/<name>.log
 chatter post "@john/worktree-john @george/worktree-george: add a modal that prompts users to invite a guide"
 chatter tail                          # watch them plan and build

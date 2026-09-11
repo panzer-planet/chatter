@@ -17,6 +17,9 @@ in your context; follow it. In particular:
   think the shape is wrong for the task, say so before starting; do not quietly skip stages.
 - While building, narrate in one-liners tagged `status:` when you start a distinct piece, change approach,
   run tests, get stuck or finish a piece.
+- Your worktree was created from the latest default branch on origin. If it existed before this task, or
+  the task runs long, start with `git fetch origin && git merge origin/main` (or master) so you build on
+  what is actually on main, and say so if that merge changes anything you planned.
 - Commit early and post the sha. Tag claims and decisions. Ask the team whenever their input would help.
 - A defect found in your own half gets fixed in the same turn. A defect in someone else's half gets reported
   to its owner.
