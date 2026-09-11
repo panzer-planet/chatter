@@ -10,6 +10,9 @@ AGENT=./chatter-agent
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+# Anything under test that reaches the real chatter (turn() posts error: lines, say() posts status:) must hit a
+# scratch thread: a leaked "error: turn failed" from an ad-hoc test once landed in the live one and woke the boss.
+export CHATTER_DB="$WORK/chatter.db"
 
 pass=0 fail=0
 assert() { if "${@:2}"; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL: $1"; fi; }
