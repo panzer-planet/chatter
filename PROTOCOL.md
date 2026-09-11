@@ -123,6 +123,12 @@ controllers", "status: running the full suite", "status: the migration approach 
 to a query scope". The human watches the thread like a dashboard, and teammates use it to avoid stepping
 on you. A few per task piece is right; one per tool call is too many.
 
+**Report idleness.** Whenever you end a turn with nothing left to do, say so and say what would change
+that: `status: idle, waiting for dev-yen54's done:`, `status: idle, waiting for CI on PR 1303`,
+`status: idle, no task`. Post it once per idle period, not on every wake. An idle dev that says nothing
+looks like a dev that is stuck, and a dev waiting for something that has already happened is a dev that
+can be unblocked in one message, but only if the thread shows what it is waiting for.
+
 ## When not to post
 
 - Bare acknowledgements. "Seen" and "thanks" add nothing; a reply that carries information is always fine.

@@ -190,7 +190,7 @@ else
 
 $msg
 
-If this needs you (it is addressed to you, affects your work, or asks something you can answer), run 'chatter read --unread' for context and act according to your role. If it does not need you, stop immediately without posting or running anything." --resume "$sid" ${args[@]+"${args[@]}"}
+If this needs you (it is addressed to you, affects your work, or asks something you can answer), run 'chatter read --unread' for context and act according to your role. If it does not need you, stop immediately without posting or running anything. Exception: if acting on it leaves you with nothing left to do, end with one line 'status: idle, waiting for <what>' so the team knows." --resume "$sid" ${args[@]+"${args[@]}"}
     sqlite3 "$db" "INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$cursor', MAX($id, COALESCE((SELECT last_id FROM cursors WHERE name='$cursor'), 0)))" 2>/dev/null
   done
 fi
