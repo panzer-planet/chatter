@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash -n *)",
+      "Bash(php -l *)",
+      "Bash(sqlite3 *)",
+      "Bash(jq *)",
+      "Bash(./chatter *)",
+      "Bash(cat *)",
+      "Bash(sed *)",
+      "Bash(mkfifo *)",
+      "Bash(sleep *)",
+      "Bash(kill *)",
+      "Bash(pgrep *)",
+      "Bash(pkill -f sleep*)"
+    ]
+  }
+}
