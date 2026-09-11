@@ -25,11 +25,12 @@ function check(bool $cond, string $msg): void {
 }
 
 // Runs `chatter <args>` as a subprocess with the given env (merged over $baseEnv) and stdin; returns [exit code, stdout, stderr].
-function chatter(array $args, array $env = [], string $stdin = ''): array {
+// $cwd overrides the working directory, e.g. to escape this repo's own .git for a "no repo detected" test.
+function chatter(array $args, array $env = [], string $stdin = '', ?string $cwd = null): array {
     global $bin, $baseEnv;
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bin) . ' ' . implode(' ', array_map('escapeshellarg', $args));
     $spec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-    $proc = proc_open($cmd, $spec, $pipes, null, array_merge($baseEnv, $env));
+    $proc = proc_open($cmd, $spec, $pipes, $cwd, array_filter(array_merge($baseEnv, $env), fn($v) => $v !== false));
     fwrite($pipes[0], $stdin);
     fclose($pipes[0]);
     $out = stream_get_contents($pipes[1]);
@@ -251,6 +252,14 @@ check(($decoded['hookSpecificOutput']['hookEventName'] ?? null) === 'PostToolUse
 chatter(['post', '--as', 'self'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111'], 'message from my own session');
 [, $out] = chatter(['notify'], ['CLAUDE_CODE_SESSION_ID' => 'sessA1111']);
 check(!str_contains($out, 'message from my own session'), 'notify: never echoes a session its own messages back');
+
+// ---- whoami: machine-stable repo name for chatter-agent ----
+
+[$code, $out] = chatter(['whoami', '--repo'], ['CHATTER_REPO' => 'someRepo']);
+check($code === 0 && $out === "someRepo\n", 'whoami --repo: prints just the repo name');
+
+[$code, $out] = chatter(['whoami', '--repo'], ['CHATTER_REPO' => false], '', sys_get_temp_dir());
+check($code === 0 && $out === "\n", 'whoami --repo: prints an empty line when there is no repo');
 
 // ----
 
