@@ -14,6 +14,12 @@ TXT);
     exit($code);
 }
 
+// PHP defaults to UTC; use $TZ or the system zone (macOS and Linux both symlink /etc/localtime into a zoneinfo dir).
+function localtz(): DateTimeZone {
+    $tz = getenv('TZ') ?: preg_replace('#.*/zoneinfo/#', '', (string)@readlink('/etc/localtime'));
+    try { return new DateTimeZone($tz ?: 'UTC'); } catch (Exception) { return new DateTimeZone('UTC'); }
+}
+
 function db(): SQLite3 {
     $path = getenv('CHATTER_DB') ?: (getenv('HOME') . '/.chatter/chatter.db');
     @mkdir(dirname($path), 0755, true);
@@ -74,7 +80,9 @@ function read(array $argv): void {
     while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
         echo isset($opts['json'])
             ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-            : sprintf("#%d  %s  %s: %s\n", $row['id'], $row['created_at'], $row['author'], $row['body']);
+            : sprintf("#%d  %s  %s: %s\n", $row['id'],
+                (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i'),
+                $row['author'], $row['body']);
     }
 }
 
