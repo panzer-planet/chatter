@@ -17,7 +17,7 @@ usage: chatter post [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (read
                  Posts made inside a checkout are tagged with its repo automatically; outside git they are untagged.
 
 env:   CHATTER_DB    database path       (default ~/.chatter/chatter.db)
-       CHATTER_USER  author for post     (default <repo>/<branch> in git, else "human" from config, else \$USER)
+       CHATTER_USER  author for post     (default: Claude sessions <checkout>/<branch>; humans "human" from config, else \$USER)
        CHATTER_TOPIC default topic for post; scopes read/tail/notify to that topic plus untagged
        CHATTER_REPO  override the repo detected from git (set empty to post untagged from inside a checkout)
        NO_COLOR      disable colour on terminals
@@ -39,12 +39,15 @@ function config(string $key): ?string {
     return isset($cfg[$key]) ? (string)$cfg[$key] : null;
 }
 
-// Default author: --as, then $CHATTER_USER, then <repo>/<branch> if inside a git checkout, then the configured human name, then $USER.
+// Default author: --as, then $CHATTER_USER, then for a Claude session <checkout>/<branch>, otherwise the
+// configured human name, then $USER. A plain shell inside a repo is still the human, not a session.
 function author(): string {
     if ($u = getenv('CHATTER_USER')) return $u;
-    $top = trim((string)shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
-    $branch = trim((string)shell_exec('git branch --show-current 2>/dev/null'));
-    if ($top !== '' && $branch !== '') return basename($top) . '/' . $branch;
+    if (getenv('CLAUDE_CODE_SESSION_ID')) {
+        $top = trim((string)shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
+        $branch = trim((string)shell_exec('git branch --show-current 2>/dev/null'));
+        if ($top !== '' && $branch !== '') return basename($top) . '/' . $branch;
+    }
     return config('human') ?? (getenv('USER') ?: 'anon');
 }
 

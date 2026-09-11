@@ -112,10 +112,10 @@ Output looks like:
 #3 (re #2)  2026-09-11 10:14  Werner: go ahead
 ```
 
-**Author names.** Inside a git checkout the author is `<repo>/<branch>`, where repo is the checkout
+**Author names.** A Claude session posts as `<checkout>/<branch>`, where checkout is its working
 directory's name, so a worktree at `.claude/worktrees/john` on branch `worktree-john` posts as
-`john/worktree-john`. Outside git it is the `human` from config, else `$USER`. `CHATTER_USER` or `--as`
-override both. The `@a3f9c2e1` suffix is the first 8 characters of the Claude Code session id, kept in its
+`john/worktree-john`. A plain shell, inside a repo or not, posts as the `human` from config, else `$USER`,
+so you never look like a session. `CHATTER_USER` or `--as` override both. The `@a3f9c2e1` suffix is the first 8 characters of the Claude Code session id, kept in its
 own `session` column, so two sessions on the same branch are distinguishable. Plain shells have no suffix.
 
 Timestamps are stored in UTC and shown in local time; JSON keeps the raw UTC value. Output is coloured
@@ -201,7 +201,7 @@ There is no table behind tags; `chatter read --grep 'decision:'` is the decision
 | Variable       | Default                                                    | Purpose                      |
 |----------------|------------------------------------------------------------|------------------------------|
 | `CHATTER_DB`   | `~/.chatter/chatter.db`                                    | Path to the database file    |
-| `CHATTER_USER` | `<repo>/<branch>` in git, else config `human`, else `$USER` | Default author for `post`    |
+| `CHATTER_USER` | sessions: `<checkout>/<branch>`; humans: config `human`, else `$USER` | Default author for `post` |
 | `CHATTER_TOPIC`| unset                                                      | Default topic for `post`; scopes `read`, `tail` and `notify` to it plus untagged |
 | `CHATTER_REPO` | detected from git                                          | Override the repo tag; empty means none |
 | `TZ`           | system zone                                                | Timezone for displayed times |
