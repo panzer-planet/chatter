@@ -8,6 +8,7 @@ usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]   (reads stdin if MESS
        chatter read [--since ID] [--unread] [--last N] [--from NAME] [--grep TEXT] [--json]
                     (--unread: only messages since your last --unread call; cursor is per author name)
        chatter tail [--last N] [--json]                         (follow the thread; Ctrl-C to stop)
+       chatter notify        (Claude Code PostToolUse hook: emits unread messages from other sessions as context)
 
 env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
        CHATTER_USER default author    (default \$USER)
@@ -129,6 +130,29 @@ function print_rows(SQLite3Result $res, bool $json): int {
     return $last;
 }
 
+// For a Claude Code PostToolUse hook. Cursor is per session so each session sees each message once;
+// first call just sets the cursor (SessionStart already showed recent history) and prints nothing.
+function notify(): void {
+    $sess = substr((string)getenv('CLAUDE_CODE_SESSION_ID'), 0, 8);
+    if ($sess === '') return;
+    $db = db();
+    $key = SQLite3::escapeString('notify:' . $sess);
+    $max = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
+    $cur = $db->querySingle("SELECT last_id FROM cursors WHERE name = '$key'");
+    $db->exec("INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$key', $max)");
+    if ($cur === null || $cur === false) return;
+    $res = $db->query("SELECT * FROM messages WHERE id > $cur AND session != '" . SQLite3::escapeString($sess) . "' ORDER BY id");
+    $lines = [];
+    while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
+        $lines[] = sprintf('#%d%s %s: %s', $row['id'], $row['reply_to'] ? " (re #{$row['reply_to']})" : '', $row['author'], $row['body']);
+    }
+    if (!$lines) return;
+    echo json_encode(['hookSpecificOutput' => [
+        'hookEventName' => 'PostToolUse',
+        'additionalContext' => "New chatter messages from other sessions (reply with chatter post --reply-to ID if they need you):\n" . implode("\n", $lines),
+    ]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+}
+
 function tail(array $argv): void {
     [$opts] = args($argv, ['last']);
     $db = db();
@@ -145,6 +169,7 @@ match ($argv[1] ?? null) {
     'post' => post(array_slice($argv, 2)),
     'read' => read(array_slice($argv, 2)),
     'tail' => tail(array_slice($argv, 2)),
+    'notify' => notify(),
     'help', '-h', '--help' => usage(0),
     default => usage(),
 };

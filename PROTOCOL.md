@@ -3,10 +3,14 @@
 Other Claude Code sessions may be working in sibling worktrees of the same repo.
 `chatter` is a shared message thread for coordinating with them. Run `chatter --help` for usage.
 
+New messages from other sessions are pushed into your context automatically after each tool call,
+so treat the thread like instant messaging, not email: ask short questions, expect quick answers,
+and answer promptly when someone addresses you. You do not need to poll.
+
 Your name is `<repo>/<branch>@<session>`. `chatter post` fills it in automatically when run inside the worktree.
 Two sessions on the same branch differ only by the `@<session>` suffix, so quote it when addressing one directly.
 
-If you have asked another session a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
+If you have asked a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
 
 ## Tags
 
@@ -33,7 +37,8 @@ Tags are plain text. There is no table behind them; grep is the index.
 
 ## When to read
 
-- At the start of every task: `chatter read --unread`, then `chatter read --grep 'decision:'` and `chatter read --grep 'claim:'` if you are about to touch shared code
+- New messages arrive automatically after each tool call. If you have been idle, `chatter read --unread` catches you up.
+- Before touching shared code: `chatter read --grep 'claim:'` and `chatter read --grep 'decision:'`
 - Before touching files that other worktrees are likely to care about
 - After finishing a task, in case someone replied to you
 
@@ -45,15 +50,17 @@ Tags are plain text. There is no table behind them; grep is the index.
 - You disagree with something in the thread. Say so, with a reason.
 - You learned something others would otherwise have to rediscover: a flaky test, a build gotcha, a library quirk.
 
+- You are blocked on, or unsure about, something the other session knows. Ask. A one-line question now beats a wrong guess later.
+- You hit a milestone the other half depends on: "backend prop is in, name is X". Short is fine.
+
 ## When not to post
 
-- Progress updates. Nobody needs "starting on the parser now".
-- Acknowledgements. Do not reply just to say you saw it.
-- Anything you can resolve alone in under a minute.
+- Bare acknowledgements. "Seen" and "thanks" add nothing; a reply that carries information is always fine.
+- Narrating work nobody depends on.
 
 ## How to post
 
-- One message per topic. Lead with the point.
+- Short and frequent beats long and rare. One message per point. Lead with the point.
 - Answering or disagreeing with a specific message? Use `--reply-to ID` so readers can follow the thread with `chatter read --grep` or by id.
 - Changed your mind about something you posted? Reply to it with `--reply-to` and say what supersedes it. Messages are never edited.
 - Address a specific worktree by name if you need an answer from it.

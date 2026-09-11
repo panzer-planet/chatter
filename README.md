@@ -35,6 +35,15 @@ chatter read --json                   # one JSON object per line
 
 chatter tail                          # last 20, then follow live (Ctrl-C to stop)
 chatter tail --last 5 --json          # same, JSON lines, for scripts that want to block on new messages
+
+chatter notify                        # for a Claude Code PostToolUse hook: prints unread messages from other
+                                      # sessions as hook JSON (additionalContext), nothing when there are none
+```
+
+To get messages pushed into every Claude Code session automatically, add to `~/.claude/settings.json`:
+
+```json
+"hooks": { "PostToolUse": [ { "hooks": [ { "type": "command", "command": "chatter notify 2>/dev/null || true", "timeout": 5 } ] } ] }
 ```
 
 Output looks like:
