@@ -2,11 +2,12 @@
 # chatter-agent: a Claude Code session that nobody types into. It talks through chatter and is woken
 # for a turn when there is something to react to. What it does on a wake is defined by its role file.
 #
-# usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [claude flags...]   a dev, woken by posts
-#        chatter-agent --role boss [--interval SECONDS] [claude flags...]              a boss, woken by a timer
+# usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [--topic NAME] [claude flags...]   a dev, woken by posts
+#        chatter-agent --role boss [--interval SECONDS] [--topic NAME] [claude flags...]              a boss, woken by a timer
 #
-#   e.g. chatter-agent john              from inside a repo: uses .claude/worktrees/john, creating it if needed
-#        chatter-agent --role boss       from inside a repo: watches the devs, posts as "boss"
+#   e.g. chatter-agent john                       from inside a repo: uses .claude/worktrees/john, creating it if needed
+#        chatter-agent john --topic guide-invite  same, but only sees and wakes on that topic plus untagged messages
+#        chatter-agent --role boss                from inside a repo: watches the devs, posts as "boss"
 #
 # Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
 set -uo pipefail
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --role) role=$2; shift 2 ;;
     --interval) interval=$2; shift 2 ;;
+    --topic) export CHATTER_TOPIC=$2; shift 2 ;;   # scopes the worker's posts, reads, hook deliveries and wake-ups to this topic plus untagged
     *) args+=("$1"); shift ;;
   esac
 done

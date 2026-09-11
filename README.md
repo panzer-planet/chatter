@@ -83,7 +83,26 @@ chatter read --json                   # one JSON object per line
 
 chatter tail                          # last 20, then follow live; this is your dashboard
 chatter tail --last 0                 # print nothing until something new arrives; blocks, for scripts
+
+chatter post --topic yen-31 "..."     # tag a message with a topic; shown as "#12 [yen-31]"
+chatter tail --topic yen-31           # only that topic
+CHATTER_TOPIC=yen-31 chatter tail     # that topic plus untagged messages, which is what a worker on the task sees
 ```
+
+**Repos** keep projects apart, automatically. A post made inside a git checkout is tagged with the repo,
+meaning the main checkout's directory name, so every worktree of `platform` agrees it is `platform`. Inside
+a checkout, `read`, `tail` and the hook only show that repo plus untagged messages; outside git you see
+everything. So a worker in one repo never sees another repo's claims, and you post to a project by standing
+in it. `--repo NAME` is a strict filter from anywhere. `CHATTER_REPO` overrides detection; set it empty to
+post untagged from inside a checkout.
+
+**Topics** keep parallel tasks in one repo apart, and are a choice rather than a fact. A message with no
+topic is general: announcements, protocol changes, anything for everyone. `--topic NAME` on `read` or
+`tail` is strict. Setting `CHATTER_TOPIC` instead makes every `post` from that shell land in the topic, and
+scopes `read`, `tail` and the hook delivery to that topic plus general. That is how workers are scoped, see
+below.
+
+Display shows both tags after the id: `#12 [platform] [yen-31] john/worktree-john: ...`.
 
 Output looks like:
 
@@ -147,9 +166,16 @@ needs (git, the test runner, the package manager) there or per project in `.clau
 **Models and flags.** Workers run on Sonnet by default. Anything after the name is passed to `claude` on
 every turn and overrides the defaults: `--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`.
 
-**Cost.** Every message from another session wakes every worker for a short turn, even when nothing is
-addressed to it, except `status:` posts, which are read on the next real turn instead. Two workers on a
-task is cheap; ten is a lot of wake-ups.
+**Topics and cost.** Every message a worker can see from another session wakes it for a short turn, even
+when nothing is addressed to it, except `status:` posts, which are read on the next real turn instead.
+Launch workers with `--topic NAME` and they only see and wake on that topic plus general messages, so two
+teams on two tasks do not pay for each other's chatter. Assign the task by posting in the topic:
+
+```sh
+chatter-agent john --topic yen-31
+chatter-agent mike --topic yen-31
+chatter post --topic yen-31 "@john/worktree-john @mike/worktree-mike: ..."
+```
 
 **Worktrees.** Sibling worktrees share one repository, so a commit in one is visible from the others with
 `git merge <branch>`; no push needed. Claude Code deletes the branch when it removes a worktree, so
@@ -176,6 +202,8 @@ There is no table behind tags; `chatter read --grep 'decision:'` is the decision
 |----------------|------------------------------------------------------------|------------------------------|
 | `CHATTER_DB`   | `~/.chatter/chatter.db`                                    | Path to the database file    |
 | `CHATTER_USER` | `<repo>/<branch>` in git, else config `human`, else `$USER` | Default author for `post`    |
+| `CHATTER_TOPIC`| unset                                                      | Default topic for `post`; scopes `read`, `tail` and `notify` to it plus untagged |
+| `CHATTER_REPO` | detected from git                                          | Override the repo tag; empty means none |
 | `TZ`           | system zone                                                | Timezone for displayed times |
 | `NO_COLOR`     | unset                                                      | Disable colour on terminals  |
 

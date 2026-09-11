@@ -4,17 +4,22 @@
 
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
-usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]      (reads stdin if MESSAGE omitted)
-       chatter read [--last N] [--since ID] [--unread] [--from NAME] [--grep TEXT] [--json]
-       chatter tail [--last N] [--json]                            (follow live; --last 0 blocks until something new)
+usage: chatter post [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (reads stdin if MESSAGE omitted)
+       chatter read [--last N] [--since ID] [--unread] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
+       chatter tail [--last N] [--topic NAME] [--repo NAME] [--json]   (follow live; --last 0 blocks until something new)
        chatter notify                                              (Claude Code PostToolUse hook; see README)
        chatter help | -h | --help                                  (works after any subcommand too)
 
        --unread  only messages since your last --unread; the cursor is stored per author name
        --from    authors starting with NAME        --grep  messages containing TEXT (case-insensitive)
+       --topic   only that topic. Without it, CHATTER_TOPIC (if set) selects that topic plus untagged messages.
+       --repo    only that repo. Without it, inside a git checkout you see that repo plus untagged messages.
+                 Posts made inside a checkout are tagged with its repo automatically; outside git they are untagged.
 
 env:   CHATTER_DB    database path       (default ~/.chatter/chatter.db)
        CHATTER_USER  author for post     (default <repo>/<branch> in git, else "human" from config, else \$USER)
+       CHATTER_TOPIC default topic for post; scopes read/tail/notify to that topic plus untagged
+       CHATTER_REPO  override the repo detected from git (set empty to post untagged from inside a checkout)
        NO_COLOR      disable colour on terminals
 file:  ~/.chatter/config.json   {"human": "Your Name"}   your display name; workers are told this is you
 
@@ -54,12 +59,16 @@ function db(): SQLite3 {
         author     TEXT NOT NULL,
         session    TEXT NOT NULL DEFAULT \'\',
         reply_to   INTEGER,
+        topic      TEXT,
+        repo       TEXT,
         body       TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
     )');
     // migrate older dbs; each is a no-op if the column already exists
     @$db->exec("ALTER TABLE messages ADD COLUMN session TEXT NOT NULL DEFAULT ''");
     @$db->exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
+    @$db->exec("ALTER TABLE messages ADD COLUMN topic TEXT");
+    @$db->exec("ALTER TABLE messages ADD COLUMN repo TEXT");
     $db->exec('CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_id INTEGER NOT NULL)');
     return $db;
 }
@@ -83,14 +92,37 @@ function args(array $argv, array $valued): array {
     return [$opts, $pos];
 }
 
+// The repo this shell is in: the main checkout's directory name, so every worktree of a repo agrees.
+// CHATTER_REPO overrides; set it empty to be in no repo. Null outside git.
+function repo_name(): ?string {
+    if (($r = getenv('CHATTER_REPO')) !== false) return $r === '' ? null : $r;
+    $common = trim((string)shell_exec('git rev-parse --path-format=absolute --git-common-dir 2>/dev/null'));
+    return $common === '' ? null : basename(dirname($common));
+}
+
+// SQL condition for scope. An explicit --topic/--repo is strict. Otherwise the shell's own topic
+// (CHATTER_TOPIC) and repo (from git) each mean "that one plus untagged", so general messages reach everyone.
+function scope_where(?string $topic, ?string $repo): string {
+    $w = [];
+    foreach (['topic' => [$topic, getenv('CHATTER_TOPIC') ?: null], 'repo' => [$repo, repo_name()]] as $col => [$explicit, $own]) {
+        if ($explicit !== null) $w[] = "$col = '" . SQLite3::escapeString($explicit) . "'";
+        elseif ($own !== null)  $w[] = "($col = '" . SQLite3::escapeString($own) . "' OR $col IS NULL)";
+    }
+    return $w ? implode(' AND ', $w) : '1';
+}
+
 function post(array $argv): void {
-    [$opts, $pos] = args($argv, ['as', 'reply-to']);
+    [$opts, $pos] = args($argv, ['as', 'reply-to', 'topic']);
     $author = $opts['as'] ?? author();
     if (!isset($pos[0]) && stream_isatty(STDIN)) usage();
     $body = trim($pos[0] ?? stream_get_contents(STDIN));
     if ($body === '') { fwrite(STDERR, "chatter: empty message (see chatter --help)\n"); exit(2); }
 
-    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, body) VALUES (:a, :s, :r, :b)');
+    $topic = $opts['topic'] ?? (getenv('CHATTER_TOPIC') ?: null);
+    $repo = repo_name();
+    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, body) VALUES (:a, :s, :r, :t, :p, :b)');
+    $st->bindValue(':t', $topic, $topic === null ? SQLITE3_NULL : SQLITE3_TEXT);
+    $st->bindValue(':p', $repo, $repo === null ? SQLITE3_NULL : SQLITE3_TEXT);
     $st->bindValue(':a', $author);
     $st->bindValue(':s', substr((string)getenv('CLAUDE_CODE_SESSION_ID'), 0, 8));
     $st->bindValue(':r', isset($opts['reply-to']) ? (int)$opts['reply-to'] : null, isset($opts['reply-to']) ? SQLITE3_INTEGER : SQLITE3_NULL);
@@ -99,9 +131,9 @@ function post(array $argv): void {
 }
 
 function read(array $argv): void {
-    [$opts] = args($argv, ['since', 'last', 'from', 'grep']);
+    [$opts] = args($argv, ['since', 'last', 'from', 'grep', 'topic', 'repo']);
     $db = db();
-    $where = ['1'];
+    $where = [scope_where($opts['topic'] ?? null, $opts['repo'] ?? null)];
     if (isset($opts['since'])) $where[] = 'id > ' . (int)$opts['since'];
     if (isset($opts['unread'])) {
         $me = SQLite3::escapeString(author());
@@ -133,7 +165,7 @@ function print_rows(SQLite3Result $res, bool $json): int {
         $hue = 31 + crc32($row['author']) % 6; // stable colour per author: red..cyan
         printf("%s%s  %s  %s: %s\n",
             $c('1', '#' . $row['id']),
-            $row['reply_to'] ? $c('2', ' (re #' . $row['reply_to'] . ')') : '',
+            ($row['repo'] !== null ? $c('2', ' [' . $row['repo'] . ']') : '') . ($row['topic'] !== null ? $c('2', ' [' . $row['topic'] . ']') : '') . ($row['reply_to'] ? $c('2', ' (re #' . $row['reply_to'] . ')') : ''),
             $c('2', (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i')),
             $c("1;$hue", $who),
             $tty ? str_replace("\n", "\n    ", $row['body']) : $row['body']);
@@ -152,10 +184,10 @@ function notify(): void {
     $cur = $db->querySingle("SELECT last_id FROM cursors WHERE name = '$key'");
     $db->exec("INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$key', $max)");
     if ($cur === null || $cur === false) return;
-    $res = $db->query("SELECT * FROM messages WHERE id > $cur AND session != '" . SQLite3::escapeString($sess) . "' ORDER BY id");
+    $res = $db->query("SELECT * FROM messages WHERE id > $cur AND session != '" . SQLite3::escapeString($sess) . "' AND " . scope_where(null, null) . " ORDER BY id");
     $lines = [];
     while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
-        $lines[] = sprintf('#%d%s %s: %s', $row['id'], $row['reply_to'] ? " (re #{$row['reply_to']})" : '', $row['author'], $row['body']);
+        $lines[] = sprintf('#%d%s%s%s %s: %s', $row['id'], $row['repo'] !== null ? " [{$row['repo']}]" : '', $row['topic'] !== null ? " [{$row['topic']}]" : '', $row['reply_to'] ? " (re #{$row['reply_to']})" : '', $row['author'], $row['body']);
     }
     if (!$lines) return;
     echo json_encode(['hookSpecificOutput' => [
@@ -165,14 +197,15 @@ function notify(): void {
 }
 
 function tail(array $argv): void {
-    [$opts] = args($argv, ['last']);
+    [$opts] = args($argv, ['last', 'topic', 'repo']);
     $db = db();
     $n = (int)($opts['last'] ?? 20);
+    $w = scope_where($opts['topic'] ?? null, $opts['repo'] ?? null);
     $since = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
-    print_rows($db->query("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
+    print_rows($db->query("SELECT * FROM (SELECT * FROM messages WHERE $w ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
     while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed
         sleep(2);
-        $since = max($since, print_rows($db->query("SELECT * FROM messages WHERE id > $since ORDER BY id"), isset($opts['json'])));
+        $since = max($since, print_rows($db->query("SELECT * FROM messages WHERE id > $since AND $w ORDER BY id"), isset($opts['json'])));
     }
 }
 
