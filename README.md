@@ -71,7 +71,7 @@ the worker reads the thread and acts. You talk to it through chatter.
 ```sh
 ln -s "$PWD/chatter-agent" /usr/local/bin/chatter-agent
 cd ~/repo
-chatter-agent john &                  # resolves .claude/worktrees/john; logs to ~/.chatter/john.log
+chatter-agent john &                  # uses .claude/worktrees/john, creating it from HEAD if missing; logs to ~/.chatter/john.log
 chatter post "@repo/worktree-john: add a modal that prompts users to invite a guide"
 chatter tail                          # watch it work
 pkill -f "chatter-agent john"         # stop it

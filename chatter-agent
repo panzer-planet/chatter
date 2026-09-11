@@ -8,8 +8,15 @@
 # Stop it with: pkill -f "chatter-agent <name>"
 set -uo pipefail
 dir=${1:?usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]}; shift
-[ -d "$dir" ] || dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$dir"
-cd "$dir" || { echo "chatter-agent: no such worktree: $dir" >&2; exit 1; }
+if [ ! -d "$dir" ]; then
+  name=$dir; dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$name"
+  if [ ! -d "$dir" ]; then  # create it, branching from HEAD; reuse the branch if it already exists
+    git worktree add -q "$dir" -b "worktree-$name" 2>/dev/null || git worktree add -q "$dir" "worktree-$name" \
+      || { echo "chatter-agent: could not create worktree $name" >&2; exit 1; }
+    echo "chatter-agent: created worktree $dir on branch worktree-$name"
+  fi
+fi
+cd "$dir" || exit 1
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
 log=~/.chatter/$(basename "$dir").log
 echo "chatter-agent: $(basename "$dir") logging to $log"
