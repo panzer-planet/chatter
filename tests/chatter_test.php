@@ -124,6 +124,12 @@ chatter(['post', '--as', 'dave', 'second for dave to read']);
 [, $out3] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1']);
 check(count(rows($out3)) === 1 && rows($out3)[0]['body'] === 'second for dave to read', 'read: --unread picks up only what arrived since the last read');
 
+// same author name, different repos (e.g. every "boss" process): cursors must not collide
+chatter(['post', '--as', 'dave', 'third for dave to read'], ['CHATTER_REPO' => 'repoUnread2']);
+chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1', 'CHATTER_REPO' => 'repoA']);
+[, $out4] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1', 'CHATTER_REPO' => 'repoUnread2']);
+check(count(rows($out4)) === 1 && rows($out4)[0]['body'] === 'third for dave to read', 'read: --unread cursor is namespaced by repo, not just author name');
+
 // ---- scope_where: topic + repo filtering ----
 
 // A dedicated repo tag so this block's topic scoping isn't polluted by the untagged posts earlier tests made under repoA.
