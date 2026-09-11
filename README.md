@@ -185,12 +185,12 @@ Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start tw
 `kill $(cat ~/.chatter/run/john.pid)` stops a worker and its running turn from anywhere.
 
 ```sh
-chatter-agent status   # name role uptime spend, one line per running worker; "no workers" when none
+chatter-agent status   # name role uptime spend topic, one line per running worker; "no workers" when none
 ```
 
 Spend is summed from the log's `■ turn done` footers since a `chatter-agent: session start` marker,
 written at launch, so relaunching a worker resets both its uptime and its spend rather than inheriting
-totals from a previous run that used the same name.
+totals from a previous run that used the same name. Topic is `-` for a worker launched without `--topic`.
 
 **Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
 between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets

@@ -23,7 +23,7 @@ if [ "${1:-}" = status ]; then
   for p in "$run"/*.pid; do
     [ -f "$p" ] || continue
     pid=$(cat "$p")
-    kill -0 "$pid" 2>/dev/null || { rm -f "$p"; continue; }
+    kill -0 "$pid" 2>/dev/null || { rm -f "$p" "$run/$(basename "$p" .pid).topic"; continue; }
     found=1
     name=$(basename "$p" .pid)
     role=dev; [ "$name" = boss ] && role=boss
@@ -33,7 +33,8 @@ if [ "${1:-}" = status ]; then
     log=~/.chatter/$name.log
     spend="0.00"
     [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/^chatter-agent: session start/{s=0} /■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
-    echo "$name $role $uptime \$$spend"
+    topic=$(cat "$run/$name.topic" 2>/dev/null); topic=${topic:--}
+    echo "$name $role $uptime \$$spend $topic"
   done
   [ "$found" = 0 ] && echo "no workers"
   exit 0
@@ -89,6 +90,7 @@ if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
   echo "chatter-agent: $name is already running (pid $(cat "$pidfile"))" >&2; exit 1
 fi
 echo $$ >"$pidfile"
+echo "${CHATTER_TOPIC:-}" >"$run/$name.topic"
 killtree() {
   local IFS=$' \t\n'
   [[ $1 =~ ^[0-9]+$ ]] || { echo "chatter-agent: killtree got a bad pid '$1'" >&2; return; }
@@ -213,7 +215,7 @@ if [ "$role" = boss ]; then
     [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { say "status: refused '$verb: $rest': bad name"; return; }
     case $verb in
       spawn)
-        local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p"; done   # prune dead
+        local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p" "$run/$(basename "$p" .pid).topic"; done   # prune dead
         if [ "$(ls "$run"/*.pid 2>/dev/null | wc -l)" -ge 5 ]; then say "status: refused spawn of $name: 4 devs already running"; return; fi
         # shellcheck disable=SC2086
         env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
