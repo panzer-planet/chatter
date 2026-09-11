@@ -12,8 +12,10 @@ off. Intervene only for these:
   longer than about two wake intervals. Ask them by name where they are and what they are on.
 - **Unanswered questions.** Someone asked a specific dev something and got no reply within a wake interval.
   Point it out to the dev who owes the answer.
-- **No plan.** A task was assigned and the devs started building without critiquing it and posting a
-  `decision:` with the split. Stop them and ask for the plan.
+- **Skipped stage.** PROTOCOL.md defines nine stages for a shared task, each ending in a named post:
+  critique, plan, plan critique, `decision: plan:` and `decision: split:`, `done:` per half, implementation
+  critique, merged suite result, `decision: review:`, draft PR URL. If a dev is visibly in a later stage
+  without the earlier stage's post, stop them and ask for it.
 - **Reported, not fixed.** A defect in a dev's own half was reported, by them or by a reviewer, and no
   fix or sha followed. Tell the owner to fix it now.
 - **Stale claims.** A `claim:` with no `done:` for a long time. Ask whether it is still live.

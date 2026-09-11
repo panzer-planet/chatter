@@ -68,14 +68,35 @@ Tags are plain text. There is no table behind them; grep is the index.
 - Before touching files that other worktrees are likely to care about
 - After finishing a task, in case someone replied to you
 
-## When you are given a task
+## Workflow for a shared task
 
-Do not start building. Talk first, in this order:
+Do not start building when you are given a task. Work through these stages in order, and end each one
+with the post named, so everyone including the boss can see where the task is.
 
-1. **Critique the task.** Post what is unclear, what looks wrong, what it depends on, and what you would push back on. Every worker on the task does this, and reads the others' critiques. If a critique needs the human, ask them by name and carry on with what you can.
-2. **Plan together.** Propose a split and an approach. Read the other proposals and critique them: what they miss, where they conflict, what is simpler. Disagree plainly, with reasons.
-3. **Converge.** After one round of critique on the plans, post a `decision:` with the agreed split, interfaces and names. If you cannot agree, post both options and ask the human to pick. Do not go round three times.
-4. **Build**, and keep talking. Post the moment something in the plan turns out to be wrong, when you learn something the other half needs, and when you are unsure. Ask the team through chatter whenever their input would improve the result; a question costs one message, a wrong guess costs a rework.
+1. **Critique the task.** Post what is unclear, wrong, risky, or dependent on something else, and what you
+   would push back on. Read the others' critiques. If something needs the human, ask them by name and
+   carry on with what you can.
+2. **Plan.** Each of you proposes an approach and a split. Say which existing code you will reuse.
+3. **Critique the plans.** Read the others' proposals and say what they miss, where they conflict, and what
+   is simpler. Disagree plainly, with reasons. One round.
+4. **Divide the work.** Post `decision: plan: ...` with the agreed approach, and `decision: split: ...`
+   naming who owns which files and the interfaces between the halves (prop names, field types, helper
+   signatures). If you cannot agree, post both options and ask the human to pick. Do not go round three times.
+5. **Implement.** Claim files, narrate with `status:`, commit early, and talk the moment the plan turns out
+   to be wrong or you learn something the other half needs. Each half ends with `done: <files> <sha>`.
+6. **Critique each other's implementation.** Merge the other half into your worktree and read its diff
+   against the agreed interfaces and the task. Post what is wrong or missing. A defect in your own half you
+   fix in the same turn; a defect in theirs you report to its owner. Ends with each half's fixes posted as
+   `done:` again.
+7. **Merge and reach consensus.** The dev who finished last merges all halves into one branch, runs the
+   full suite and lint on the merged result, and posts the sha and the numbers. Any disagreement left over
+   is settled here with reasons, or escalated to the human.
+8. **Code review the whole.** One of you who did not do the merge reviews the merged diff as a stranger
+   would: edge cases, naming, dead code, tests that prove the behaviour rather than the implementation.
+   Ends with `decision: review: ready` or `decision: review: not ready, because ...`.
+9. **Draft PR.** When the review says ready, the merger pushes the branch and opens a draft PR with a
+   description of what was delivered and what was left open, and posts the URL. Marking it ready for
+   review is the human's call.
 
 Silence during a shared task is a smell. If you have not heard from your counterpart in a while, ask where they are.
 

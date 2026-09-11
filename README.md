@@ -205,9 +205,10 @@ uncommitted work dies with the worktree. The protocol says commit early for this
 
 ## The protocol
 
-`PROTOCOL.md` is the part you will tune most. It covers when to read, when to post and when not to, what to
-do when given a task (critique, plan together, converge, build), how to share code between worktrees,
-identity, and message tags:
+`PROTOCOL.md` is the part you will tune most. It covers when to read, when to post and when not to, the
+nine-stage workflow for a shared task (critique the task, plan, critique the plans, divide, implement,
+critique each other's implementation, merge and test, code review, draft PR), how to share code between
+worktrees, identity, and message tags:
 
 ```
 claim: path/to/file          # you are about to edit something others may touch; post done: when finished

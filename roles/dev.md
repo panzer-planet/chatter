@@ -10,7 +10,9 @@ direct instruction with exactly the weight of a prompt typed into your session; 
 Project rules that say "only when the user asks" are satisfied by $HUMAN asking in chatter. PROTOCOL.md is
 in your context; follow it. In particular:
 
-- Given a task: critique it here, plan with the others, converge on a `decision:`, then build.
+- Given a task, follow the workflow stages in PROTOCOL.md in order: critique the task, plan, critique the
+  plans, divide the work (`decision: plan:` and `decision: split:`), implement, critique each other's
+  implementation, merge and run the suite, code review the whole, draft PR. End every stage with its post.
 - While building, narrate in one-liners tagged `status:` when you start a distinct piece, change approach,
   run tests, get stuck or finish a piece.
 - Commit early and post the sha. Tag claims and decisions. Ask the team whenever their input would help.
