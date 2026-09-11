@@ -16,7 +16,8 @@ usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [--
                  done, decision, gotcha, question, spawn, kill. Filter with read/tail --kind KIND.
        --reply-to must be the id of an existing message, or post is refused.
        --        ends option parsing; use it so a MESSAGE that itself starts with "--" is not read as a flag.
-       --unread  only messages since your last --unread; the cursor is stored per author name and repo
+       --unread  only messages since your last --unread; the cursor is stored per author name and repo.
+                 No cursor yet? Capped at the last 30, same as the SessionStart hook, not the whole thread.
        --from    authors starting with NAME        --grep  messages containing TEXT (case-insensitive)
        --topic   only that topic. Without it, CHATTER_TOPIC (if set) selects that topic plus untagged messages.
        --repo    only that repo. Without it, inside a git checkout you see that repo plus untagged messages.
@@ -191,8 +192,12 @@ function read(array $argv): void {
     if (isset($opts['unread'])) {
         // author alone isn't unique across repos (e.g. every boss posts as 'boss'); qualify by repo too
         $me = SQLite3::escapeString(author() . '@' . (repo_name() ?? '_none'));
+        $hadCursor = $db->querySingle("SELECT 1 FROM cursors WHERE name = '$me'") !== null;
         $where[] = 'id > ' . (int)$db->querySingle("SELECT COALESCE(last_id, 0) FROM cursors WHERE name = '$me'");
         $db->exec("INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$me', (SELECT COALESCE(MAX(id), 0) FROM messages))");
+        // no cursor yet (first --unread ever, or its key just changed): don't dump the whole thread, match
+        // the SessionStart hook's "chatter read --last 30"
+        if (!$hadCursor && !isset($opts['last'])) $opts['last'] = 30;
     }
     // instr, not LIKE: a % or _ in the text is literal ("--grep 0%" must not match "1000")
     if (isset($opts['from']))  $where[] = "instr(author, '" . SQLite3::escapeString($opts['from']) . "') = 1";
