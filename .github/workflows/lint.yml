@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck chatter-agent
+      - run: shellcheck chatter-agent tests/chatter-agent_test.sh
 
   phpstan:
     runs-on: ubuntu-latest

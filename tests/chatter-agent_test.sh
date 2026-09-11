@@ -188,7 +188,7 @@ assert_contains "wake_reason wakes on its own no-CI verdict too" "$out" "CI verd
 out=$(wake_reason "$(line chat "hey @boss can you look" dev1 zzz)" abc12345 "" "")
 assert_contains "wake_reason wakes on an @boss mention" "$out" "Someone mentioned @boss"
 
-out=$(wake_reason "$(line done "done: foo.php sha1" dev1 zzz)" abc12345 "" "")
+out=$(wake_reason "$(line "done" "done: foo.php sha1" dev1 zzz)" abc12345 "" "")
 assert_contains "wake_reason wakes on a done:" "$out" "A dev posted done:"
 
 out=$(wake_reason "$(line decision "decision: plan: x" dev1 zzz)" abc12345 "" "")
