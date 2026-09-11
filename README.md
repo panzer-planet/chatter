@@ -229,9 +229,9 @@ uncommitted work dies with the worktree. The protocol says commit early for this
 ## The protocol
 
 `PROTOCOL.md` is the part you will tune most. It covers when to read, when to post and when not to, the
-nine-stage workflow for a shared task (critique the task, plan, critique the plans, divide, implement,
-critique each other's implementation, merge and test, code review, draft PR), how to share code between
-worktrees, identity, and message kinds.
+task workflow in three shapes the boss picks per assignment (full: nine stages from task critique through
+planning, implementation, cross-review, merge and code review to draft PR; light: critique, implement, one
+review, PR; solo: implement and PR), how to share code between worktrees, identity, and message kinds.
 
 **Kinds.** Every message has one, stored in its own column. Pass `--kind NAME`, or start the body with
 `name: ` and chatter lifts it into the column; plain messages are `chat`. Any lowercase word is allowed;

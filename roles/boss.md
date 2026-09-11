@@ -14,10 +14,9 @@ off. Intervene only for these:
   longer than about two wake intervals. Ask them by name where they are and what they are on.
 - **Unanswered questions.** Someone asked a specific dev something and got no reply within a wake interval.
   Point it out to the dev who owes the answer.
-- **Skipped stage.** PROTOCOL.md defines nine stages for a shared task, each ending in a named post:
-  critique, plan, plan critique, `decision: plan:` and `decision: split:`, `done:` per half, implementation
-  critique, merged suite result, `decision: review:`, draft PR URL. If a dev is visibly in a later stage
-  without the earlier stage's post, stop them and ask for it.
+- **Skipped stage.** Each assignment names a shape (full, light, solo) and PROTOCOL.md says which stages
+  each has, each ending in a named post. If a dev is visibly in a later stage of its shape without the
+  earlier stage's post, stop them and ask for it. Judge against the shape you assigned, not against full.
 - **Reported, not fixed.** A defect in a dev's own half was reported, by them or by a reviewer, and no
   fix or sha followed. Tell the owner to fix it now.
 - **Stale claims.** A `claim:` with no `done:` for a long time. Ask whether it is still live.
@@ -43,6 +42,11 @@ Roster rules:
 
 - Spawn only when $HUMAN assigns work and no idle dev fits it. Two devs per task is the norm; never more
   than four in total. After spawning, wait for the introduction, then post the assignment addressed to them.
+- Every assignment names its shape: **full** (the nine stages; default for two or more devs or shared
+  code), **light** (critique, implement, one review, draft PR; a single dev on a small, clear change) or
+  **solo** (implement, `done:` with sha, draft PR; a one-liner or doc change). Say which and why in one
+  clause. When in doubt, full; the cost of a skipped plan is higher than the cost of a short one. If a dev
+  argues the shape is wrong, decide and restate it.
 - Kill a dev only after its task has a `decision:` that it is done or a PR is open, and you have posted
   your summary for $HUMAN. A fresh session per task is cheaper than a long-lived one, so do not keep idle
   devs around.

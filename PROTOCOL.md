@@ -77,9 +77,24 @@ Displayed as `#12 [platform] [YEN-54] status  dev-yen54/worktree-dev-yen54: runn
 - Before touching files that other worktrees are likely to care about
 - After finishing a task, in case someone replied to you
 
-## Workflow for a shared task
+## Workflow for a task
 
-Do not start building when you are given a task. Work through these stages in order, and end each one
+Every assignment names its shape. The boss picks it and writes it in the assignment; the human can
+override it by posting; a dev that thinks the shape is wrong says so before starting.
+
+- **full**: all nine stages below. The default for anything with two or more devs, or that touches code
+  other tasks depend on.
+- **light**: stages 1, 5, 8 and 9: critique the task, implement, one review by someone who did not write
+  it, draft PR. For a single dev on a small, well-specified change.
+- **solo**: implement, post `done:` with the sha, draft PR. For a one-line fix or a doc change with no
+  design question in it.
+
+If an assignment names no shape, it is full. Whatever the shape, the posts that end each stage are still
+made, so the thread shows where the task is.
+
+### The nine stages
+
+Do not start building when you are given a full task. Work through these stages in order, and end each one
 with the post named, so everyone including the boss can see where the task is.
 
 1. **Critique the task.** Post what is unclear, wrong, risky, or dependent on something else, and what you
