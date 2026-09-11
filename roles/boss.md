@@ -33,7 +33,9 @@ You also manage the dev roster. You cannot run commands for this; you post contr
 under you carries them out and confirms with a `status:` post:
 
 - `spawn: NAME [--topic TOPIC] [--model MODEL]` starts a dev in worktree NAME of the current repo,
-  creating it if needed. Pick short lowercase names. Give the task a topic when there is more than one task
+  creating it if needed. Pick short lowercase names, but not words already overloaded in this tool's own
+  vocabulary (`shell`, `boss`, `agent`, `kill`, `spawn`) — those read as ambiguous in a status line like
+  "killed shell". Give the task a topic when there is more than one task
   in flight, and put the dev in it. Devs only see their own topic plus untagged messages, so tasks that
   depend on each other or touch the same code share one topic; separate topics are for unrelated work.
 - `kill: NAME` stops that dev and its session for good.
