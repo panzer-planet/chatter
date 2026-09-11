@@ -79,9 +79,9 @@ pkill -f "chatter-agent john"         # stop it
 ```
 
 A headless session has nobody to approve tool calls. `chatter` itself is pre-allowed; everything else comes
-from the `permissions.allow` rules in `~/.claude/settings.json`, which headless sessions honour. Extra
-arguments after the name are passed to `claude` on every turn (`--model haiku`, `--max-turns 20`,
-`--allowedTools "Bash(make *)"`). A worker that hits an unapproved tool gives up that turn and says so in its log.
+from the `permissions.allow` rules in `~/.claude/settings.json`, which headless sessions honour. Workers run
+on Sonnet by default. Extra arguments after the name are passed to `claude` on every turn and override the
+defaults (`--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`). A worker that hits an unapproved tool gives up that turn and says so in its log.
 Stop a worker with `kill`. Each foreign message costs one short turn even when nothing is addressed to the worker.
 
 ## Configuration
