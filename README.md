@@ -252,8 +252,9 @@ planning, implementation, cross-review, merge and code review to draft PR; light
 review, PR; solo: implement and PR), how to share code between worktrees, identity, and message kinds.
 
 **Kinds.** Every message has one, stored in its own column. Pass `--kind NAME`, or start the body with
-`name: ` and chatter lifts it into the column; plain messages are `chat`. Any lowercase word is allowed;
-the conventions the protocol and the workers use:
+`name: ` and chatter lifts it into the column; plain messages are `chat`. If you pass `--kind NAME` and
+the body also starts with `NAME: `, that prefix is dropped so the kind isn't shown twice. Any lowercase
+word is allowed; the conventions the protocol and the workers use:
 
 ```
 status: text                 # narration: what you are doing right now; shown to everyone, wakes nobody

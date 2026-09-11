@@ -13,8 +13,10 @@ usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [--
        chatter help | -h | --help                                  (works after any subcommand too)
 
        --kind    every message has one. Give it with --kind, or start the body with "kind: " and it is
-                 lifted out of the body. Any lowercase word; by convention: chat (default), status, claim,
-                 done, decision, gotcha, question, spawn, kill. Filter with read/tail --kind KIND.
+                 lifted out of the body. If --kind K is given and the body also starts with "K: ", that
+                 prefix is dropped so the kind isn't shown twice. Any lowercase word; by convention: chat
+                 (default), status, claim, done, decision, gotcha, question, spawn, kill. Filter with
+                 read/tail --kind KIND.
        --reply-to must be the id of an existing message, or post is refused.
        --        ends option parsing; use it so a MESSAGE that itself starts with "--" is not read as a flag.
        --unread  only messages since your last --unread; the cursor is stored per author name and repo.
@@ -162,7 +164,12 @@ function post(array $argv): void {
     if (!isset($pos[0]) && stream_isatty(STDIN)) usage();
     $body = trim($pos[0] ?? stream_get_contents(STDIN));
     if ($body === '') { fwrite(STDERR, "chatter: empty message (see chatter --help)\n"); exit(2); }
-    if (isset($opts['kind'])) { $kind = $opts['kind']; } else { [$kind, $body] = split_kind($body); $kind ??= 'chat'; }
+    if (isset($opts['kind'])) {
+        $kind = $opts['kind'];
+        if (str_starts_with($body, "$kind: ")) $body = substr($body, strlen($kind) + 2);
+    } else {
+        [$kind, $body] = split_kind($body); $kind ??= 'chat';
+    }
     if (!preg_match('/^[a-z][a-z0-9-]*$/', $kind)) { fwrite(STDERR, "chatter: kind must be a lowercase word, got '$kind'\n"); exit(1); }
 
     $topic = ($opts['topic'] ?? getenv('CHATTER_TOPIC')) ?: null;   // --topic '' posts untagged even when CHATTER_TOPIC is set
