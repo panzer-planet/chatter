@@ -184,6 +184,10 @@ Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start tw
 chatter-agent status   # name role uptime spend, one line per running worker; "no workers" when none
 ```
 
+Spend is summed from the log's `■ turn done` footers since a `chatter-agent: session start` marker,
+written at launch, so relaunching a worker resets both its uptime and its spend rather than inheriting
+totals from a previous run that used the same name.
+
 **Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
 between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets
 the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need

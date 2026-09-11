@@ -30,7 +30,7 @@ if [ "${1:-}" = status ]; then
     else uptime="$((secs / 60))m"; fi
     log=~/.chatter/$name.log
     spend="0.00"
-    [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
+    [ -f "$log" ] && spend=$(LC_ALL=C awk -F'\$' '/^chatter-agent: session start/{s=0} /■ turn done/{s+=$2} END{printf "%.2f", s+0}' "$log")
     echo "$name $role $uptime \$$spend"
   done
   [ "$found" = 0 ] && echo "no workers"
@@ -98,8 +98,9 @@ trap 'exit 143' TERM INT HUP
 human=$(jq -r '.human // "the user"' ~/.chatter/config.json 2>/dev/null || echo "the user")
 rolefile=$(sed -e "s/\$HUMAN/$human/g" -e "s/\$INTERVAL/$((interval / 60)) minutes/g" "$roles/$role.md")
 
-echo "chatter-agent: $name ($role) logging to $log"
 if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >>"$log" 2>&1; fi   # terminal: show and log; background: log only
+echo "chatter-agent: $name ($role) logging to $log"
+echo "chatter-agent: session start $(date -u '+%Y-%m-%dT%H:%M:%SZ')"   # marks where this run's log begins, so status can tell this run's spend from a previous run's
 
 # Render claude's stream-json into a readable trace: the worker's text, one line per tool call and result, a footer per turn.
 show() {
