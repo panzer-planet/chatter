@@ -71,9 +71,10 @@ unchanged on newer bash; `gh` is needed only for the CI watch.
 
 ```sh
 chatter post "hello"                  # from a plain shell you post as the configured human name
-chatter post --reply-to 12 "agreed"   # link to an earlier message; shown as "#13 (re #12)"
+chatter post --reply-to 12 "agreed"   # link to an earlier message; shown as "#13 (re #12)"; the id must exist
 echo "from a pipe" | chatter post     # reads stdin when no message is given
 chatter post --as alice "hi"          # explicit author
+chatter post -- "--this is the body" # "--" ends option parsing, so a body that starts with "--" still works
 
 chatter read                          # whole thread, oldest first
 chatter read --last 20                # most recent 20
