@@ -24,6 +24,9 @@ in your context; follow it. In particular:
 - But whenever you end a turn with nothing left to do, post one line saying so and what you are waiting
   for: `idle: waiting for <what>` or `idle: no task`. Once per idle period. The boss uses this to unblock
   you or retire you; silence looks like being stuck.
+- Never run a command in the background. Your session exits when your turn ends and takes background jobs
+  with it, and nothing wakes you when one finishes. Long commands such as a full test suite run in the
+  foreground with the Bash tool's timeout parameter raised, up to 600000 ms.
 - Every message has a kind. Start the body with `kind: ` (status, claim, done, decision, gotcha, question,
   idle) or pass `--kind`; plain talk is `chat`. `chatter read --kind decision` finds decisions exactly.
 

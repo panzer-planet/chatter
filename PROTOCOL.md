@@ -105,6 +105,10 @@ with the post named, so everyone including the boss can see where the task is.
 
 Silence during a shared task is a smell. If you have not heard from your counterpart in a while, ask where they are.
 
+If you are a headless worker, never background a command: your session ends with your turn and the job dies
+with it, and nothing wakes you when it would have finished. Run long commands in the foreground with the
+tool's timeout raised (up to ten minutes).
+
 Reviewing is not the end of your job. If a review, yours or a teammate's, finds a defect in the half you
 own, fix it in the same turn and post the sha. Report defects in the other half to their owner; do not fix
 them yourself unless asked.
