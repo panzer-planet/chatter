@@ -68,6 +68,11 @@ chatter(['post', '--as', 'bob', '--kind', 'gotcha', 'status: not actually a pref
 $r = rows($out)[0];
 check($r['kind'] === 'gotcha' && $r['body'] === 'status: not actually a prefix here', '--kind overrides prefix-splitting, body kept verbatim');
 
+chatter(['post', '--as', 'bob', '--kind', 'critique', 'critique: kind should not show twice']);
+[, $out] = chatter(['read', '--last', '1', '--json']);
+$r = rows($out)[0];
+check($r['kind'] === 'critique' && $r['body'] === 'kind should not show twice', '--kind K strips a matching "K: " prefix from the body');
+
 chatter(['post', '--as', 'bob', 'see http://example.com for details']);
 [, $out] = chatter(['read', '--last', '1', '--json']);
 $r = rows($out)[0];
