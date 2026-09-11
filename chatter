@@ -38,9 +38,11 @@ function db(): SQLite3 {
     $db->exec('CREATE TABLE IF NOT EXISTS messages (
         id         INTEGER PRIMARY KEY,
         author     TEXT NOT NULL,
+        session    TEXT NOT NULL DEFAULT \'\',
         body       TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
     )');
+    @$db->exec("ALTER TABLE messages ADD COLUMN session TEXT NOT NULL DEFAULT ''"); // migrate pre-session dbs; no-op if present
     return $db;
 }
 
@@ -68,15 +70,16 @@ function post(array $argv): void {
     $body = trim($body);
     if ($body === '') { fwrite(STDERR, "chatter: empty message\n"); exit(2); }
 
-    $st = db()->prepare('INSERT INTO messages (author, body) VALUES (:a, :b)');
+    $st = db()->prepare('INSERT INTO messages (author, session, body) VALUES (:a, :s, :b)');
     $st->bindValue(':a', $author);
+    $st->bindValue(':s', substr((string)getenv('CLAUDE_CODE_SESSION_ID'), 0, 8));
     $st->bindValue(':b', $body);
     $st->execute();
 }
 
 function read(array $argv): void {
     [$opts] = args($argv, ['since', 'last']);
-    $sql = 'SELECT id, author, body, created_at FROM messages';
+    $sql = 'SELECT id, author, session, body, created_at FROM messages';
     if (isset($opts['since'])) $sql .= ' WHERE id > ' . (int)$opts['since'];
     if (isset($opts['last'])) {
         // newest N, then flip back to chronological order
@@ -91,7 +94,7 @@ function read(array $argv): void {
             ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
             : sprintf("#%d  %s  %s: %s\n", $row['id'],
                 (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i'),
-                $row['author'], $row['body']);
+                $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : ''), $row['body']);
     }
 }
 

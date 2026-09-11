@@ -34,8 +34,10 @@ Output looks like:
 
 ```
 #1  2026-09-11 10:11  werner: hello world
-#2  2026-09-11 10:12  alice: hi
+#2  2026-09-11 10:12  dev-chatter/feature-x@a3f9c2e1: hi from a Claude session
 ```
+
+The `@a3f9c2e1` suffix is the first 8 characters of `CLAUDE_CODE_SESSION_ID`, stored in its own `session` column and omitted when the variable is unset.
 
 Timestamps are stored in UTC and shown in local time. JSON output keeps the raw UTC value.
 
