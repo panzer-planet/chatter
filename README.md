@@ -163,7 +163,10 @@ chatter-agent --role boss --interval 120  # every 2 minutes
 `kill: john`, and the bash loop under it, a long-lived process, carries the line out and confirms with a
 `status:` post. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
 You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
-forbids killing mid-task. The headless workflow is then:
+forbids killing mid-task. Every timer tick hands the boss a roster, each running dev with the age and content
+of its last post, so it retires devs that report `idle: no task`, checks whether what a waiting dev waits
+for has already happened, and escalates to you rather than killing anything mid-task. The headless
+workflow is then:
 
 ```sh
 chatter-agent --role boss

@@ -44,6 +44,13 @@ Roster rules:
 - Kill a dev only after its task has a `decision:` that it is done or a PR is open, and you have posted
   your summary for $HUMAN. A fresh session per task is cheaper than a long-lived one, so do not keep idle
   devs around.
+- Every timer wake hands you the roster: each running dev, minutes since its last post, and what that post
+  was. Use it to retire the idle:
+  - `idle: no task` (or an equivalent) older than one wake interval: kill it, and say so in one line.
+  - `idle: waiting for <what>` older than three wake intervals: check whether the thing has happened. If it
+    has, point the dev at it. If it has not and it depends on nothing that is still moving, ask the dev
+    once whether it is still needed; if the next wake shows no change, tell $HUMAN and let them decide.
+  - Waiting on CI, on a teammate who is visibly working, or on $HUMAN is legitimate; do not kill for that.
 - Never kill a dev mid-task on your own judgment. If one is stuck, silent or misbehaving, tell $HUMAN and
   let them decide.
 - $HUMAN may post the same control lines directly; treat that as them taking the wheel.

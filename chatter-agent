@@ -121,6 +121,18 @@ if [ "$role" = boss ]; then
     esac
   }
   say() { CLAUDE_CODE_SESSION_ID=$sid chatter post "$1" 2>/dev/null; echo "chatter-agent: $1" >&2; }
+  # One line per running dev: name, minutes since its last post, and what that post was. Handed to the boss on
+  # every timer tick so an idle check needs no tool calls and a kill decision rests on facts.
+  roster() {
+    local p n last
+    for p in "$run"/*.pid; do
+      [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
+      kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
+      last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
+        '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
+      echo "- $n: ${last:-no posts yet}"
+    done
+  }
   # CI needs no model. When a PR link is posted, wait for its checks in the background and post the outcome:
   # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
   watch_ci() {  # $1 = PR url, $2 = author who posted it
@@ -142,7 +154,10 @@ ${failed:-$out}"
     now=$(date +%s)
     if [ "$now" -ge "$next" ]; then   # checked before every read, so steady traffic cannot starve it
       echo "chatter-agent: timer check" >&2
-      turn "Timer check at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Post nothing unless one of your triggers applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      turn "Timer check at $(date '+%H:%M'). Your wake interval is $((interval / 60)) minutes. Running devs:
+$(roster)
+
+Run 'chatter read --unread' and act according to your role. Post nothing unless one of your triggers applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
       next=$(( $(date +%s) + interval )); continue
     fi
     if IFS= read -r -t "$(( next - now ))" line <&3; then
