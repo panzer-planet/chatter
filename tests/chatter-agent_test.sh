@@ -233,5 +233,14 @@ assert_contains "status lists repoB's same-named dev separately" "$out" "repoB d
 assert_contains "status carries repoA's topic through" "$out" "topicA"
 assert_eq "status defaults a topic-less repo's dev to -" "$(echo "$out" | grep '^repoB ' | awk '{print $NF}')" "-"
 
+### roster: says "none running" outright, since an empty list read to a restarted boss as missing info ###
+roster_src=$(sed -n '/^roster() {/,/^}/p' "$AGENT")
+[ -n "$roster_src" ] || { echo "could not extract roster() from $AGENT" >&2; exit 1; }
+eval "$roster_src"
+run=$(mktemp -d "$WORK/roster.XXXXXX")
+echo 99999999 >"$run/gone.pid"   # a dead dev's leftover pidfile
+assert_eq "roster reports no devs as 'none running', not as nothing" "$(roster)" "- none running"
+assert "roster prunes a dead dev's pidfile" [ ! -f "$run/gone.pid" ]
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

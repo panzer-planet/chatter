@@ -182,16 +182,17 @@ CLAUDE_CODE_SESSION_ID=$sid chatter read --unread >/dev/null 2>&1
 
 # One line per running dev: name, minutes since its last post, and what that post was. Handed to the boss on
 # every timer tick so an idle check needs no tool calls and a kill decision rests on facts.
-roster() {
-  local p n last
+roster() {   # "none" said outright: an empty list read as missing, and a restarted boss rebuilt the roster from the thread
+  local p n last any=""
   for p in "$run"/*.pid; do
     [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
     kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
     # shellcheck disable=SC1007  # CHATTER_TOPIC= clears the env var on purpose, not a typo for CHATTER_TOPIC=chatter
     last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
       '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
-    echo "- $n: ${last:-no posts yet}"
+    echo "- $n: ${last:-no posts yet}"; any=1
   done
+  [ -n "$any" ] || echo "- none running"
 }
 
 intro="Your role:
