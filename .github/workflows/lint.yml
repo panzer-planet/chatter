@@ -18,3 +18,9 @@ jobs:
           php-version: '8.3'
       - run: composer install --no-interaction --prefer-dist
       - run: vendor/bin/phpstan analyse --no-progress
+
+  bashtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tests/chatter-agent_test.sh
