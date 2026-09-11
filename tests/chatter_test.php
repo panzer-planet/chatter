@@ -130,6 +130,14 @@ chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1', 'CHATTER_R
 [, $out4] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader1', 'CHATTER_REPO' => 'repoUnread2']);
 check(count(rows($out4)) === 1 && rows($out4)[0]['body'] === 'third for dave to read', 'read: --unread cursor is namespaced by repo, not just author name');
 
+// first --unread ever (no cursor row yet) must not dump the whole thread: cap at the last 30, same as the SessionStart hook
+for ($i = 1; $i <= 35; $i++) chatter(['post', '--as', 'dave', "flood $i"], ['CHATTER_REPO' => 'repoFlood']);
+[, $out5] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader2', 'CHATTER_REPO' => 'repoFlood']);
+check(count(rows($out5)) === 30 && rows($out5)[0]['body'] === 'flood 6', 'read: --unread with no prior cursor returns only the last 30');
+chatter(['post', '--as', 'dave', 'flood 36'], ['CHATTER_REPO' => 'repoFlood']);
+[, $out6] = chatter(['read', '--unread', '--json'], ['CHATTER_USER' => 'reader2', 'CHATTER_REPO' => 'repoFlood']);
+check(count(rows($out6)) === 1 && rows($out6)[0]['body'] === 'flood 36', 'read: --unread cursor still advances normally after the capped first read');
+
 // ---- scope_where: topic + repo filtering ----
 
 // A dedicated repo tag so this block's topic scoping isn't polluted by the untagged posts earlier tests made under repoA.

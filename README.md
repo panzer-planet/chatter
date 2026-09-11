@@ -77,7 +77,8 @@ chatter post --as alice "hi"          # explicit author
 
 chatter read                          # whole thread, oldest first
 chatter read --last 20                # most recent 20
-chatter read --unread                 # only what you haven't seen; cursor stored per author name and repo
+chatter read --unread                 # only what you haven't seen; cursor stored per author name and repo,
+                                       # capped at the last 30 the first time (no cursor yet), never the whole thread
 chatter read --since 42               # only messages with id > 42
 chatter read --from john              # only authors starting with "john"
 chatter read --grep 'decision:'       # only messages containing the text (case-insensitive)
