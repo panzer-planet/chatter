@@ -5,7 +5,8 @@
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
 usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]   (reads stdin if MESSAGE omitted)
-       chatter read [--since ID] [--last N] [--from NAME] [--grep TEXT] [--json]
+       chatter read [--since ID] [--unread] [--last N] [--from NAME] [--grep TEXT] [--json]
+                    (--unread: only messages since your last --unread call; cursor is per author name)
        chatter tail [--last N] [--json]                         (follow the thread; Ctrl-C to stop)
 
 env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
@@ -47,6 +48,7 @@ function db(): SQLite3 {
     // migrate older dbs; each is a no-op if the column already exists
     @$db->exec("ALTER TABLE messages ADD COLUMN session TEXT NOT NULL DEFAULT ''");
     @$db->exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
+    $db->exec('CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_id INTEGER NOT NULL)');
     return $db;
 }
 
@@ -55,8 +57,10 @@ function args(array $argv, array $valued): array {
     $opts = []; $pos = [];
     for ($i = 0; $i < count($argv); $i++) {
         $a = $argv[$i];
+        if ($a === '-h') usage(0);
         if (!str_starts_with($a, '--')) { $pos[] = $a; continue; }
         $name = substr($a, 2);
+        if ($name === 'help') usage(0);
         if (in_array($name, $valued, true)) {
             if (!isset($argv[$i + 1])) usage();
             $opts[$name] = $argv[++$i];
@@ -70,9 +74,9 @@ function args(array $argv, array $valued): array {
 function post(array $argv): void {
     [$opts, $pos] = args($argv, ['as', 'reply-to']);
     $author = $opts['as'] ?? author();
-    $body = $pos[0] ?? stream_get_contents(STDIN);
-    $body = trim($body);
-    if ($body === '') { fwrite(STDERR, "chatter: empty message\n"); exit(2); }
+    if (!isset($pos[0]) && stream_isatty(STDIN)) usage();
+    $body = trim($pos[0] ?? stream_get_contents(STDIN));
+    if ($body === '') { fwrite(STDERR, "chatter: empty message (see chatter --help)\n"); exit(2); }
 
     $st = db()->prepare('INSERT INTO messages (author, session, reply_to, body) VALUES (:a, :s, :r, :b)');
     $st->bindValue(':a', $author);
@@ -84,8 +88,14 @@ function post(array $argv): void {
 
 function read(array $argv): void {
     [$opts] = args($argv, ['since', 'last', 'from', 'grep']);
+    $db = db();
     $where = ['1'];
     if (isset($opts['since'])) $where[] = 'id > ' . (int)$opts['since'];
+    if (isset($opts['unread'])) {
+        $me = SQLite3::escapeString(author());
+        $where[] = 'id > ' . (int)$db->querySingle("SELECT COALESCE(last_id, 0) FROM cursors WHERE name = '$me'");
+        $db->exec("INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$me', (SELECT COALESCE(MAX(id), 0) FROM messages))");
+    }
     if (isset($opts['from']))  $where[] = "author LIKE '" . SQLite3::escapeString($opts['from']) . "%'";
     if (isset($opts['grep']))  $where[] = "body LIKE '%" . SQLite3::escapeString($opts['grep']) . "%'";
     $sql = 'SELECT * FROM messages WHERE ' . implode(' AND ', $where);
@@ -96,7 +106,7 @@ function read(array $argv): void {
         $sql .= ' ORDER BY id';
     }
 
-    print_rows(db()->query($sql), isset($opts['json']));
+    print_rows($db->query($sql), isset($opts['json']));
 }
 
 // Print rows; returns the last id seen (0 if none).

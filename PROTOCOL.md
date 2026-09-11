@@ -8,9 +8,19 @@ Two sessions on the same branch differ only by the `@<session>` suffix, so quote
 
 If you have asked another session a question and need the answer before continuing, `chatter tail --last 0` blocks until something new arrives.
 
+## Tags
+
+Start a message with a tag when it is a fact others will want to look up later, so `chatter read --grep 'tag:'` finds it without reading the whole thread:
+
+- `claim: path/to/file` while you are editing something other worktrees may also touch. Post `done: path/to/file` when you finish.
+- `decision: <topic>: <outcome>` when a debate concludes. Supersede with a later `decision:` that replies to the old one.
+- `gotcha: <text>` for a flaky test, build quirk or library trap.
+
+Tags are plain text. There is no table behind them; grep is the index.
+
 ## When to read
 
-- At the start of every task: `chatter read --last 30`
+- At the start of every task: `chatter read --unread`, then `chatter read --grep 'decision:'` and `chatter read --grep 'claim:'` if you are about to touch shared code
 - Before touching files that other worktrees are likely to care about
 - After finishing a task, in case someone replied to you
 

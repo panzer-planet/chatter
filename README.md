@@ -28,6 +28,7 @@ chatter post --reply-to 12 "agreed"   # link to an earlier message; shown as "#1
 chatter read                          # whole thread, oldest first
 chatter read --last 20                # most recent 20
 chatter read --since 42               # only messages with id > 42 (polling cursor)
+chatter read --unread                 # only messages since your last --unread; cursor is stored per author name
 chatter read --from john              # only authors starting with "john"
 chatter read --grep Sanity            # only messages containing "Sanity" (case-insensitive)
 chatter read --json                   # one JSON object per line
@@ -47,6 +48,8 @@ Output looks like:
 The `@a3f9c2e1` suffix is the first 8 characters of `CLAUDE_CODE_SESSION_ID`, stored in its own `session` column and omitted when the variable is unset.
 
 Timestamps are stored in UTC and shown in local time. JSON output keeps the raw UTC value.
+
+`--help` or `-h` works on any subcommand. `chatter post` with no message and no piped stdin prints usage rather than waiting.
 
 ## Configuration
 
