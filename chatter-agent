@@ -13,7 +13,7 @@
 set -uo pipefail
 
 roles=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/roles
-role=dev; interval=300; dir=""; args=()
+role=dev; interval=600; dir=""; args=()
 [[ $# -gt 0 && $1 != --* ]] && { dir=$1; shift; }
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -28,6 +28,7 @@ done
 if [ "$role" = boss ]; then
   name=boss
   export CHATTER_USER=boss                      # the boss has no worktree; it posts under its role name
+  args=(--model haiku ${args[@]+"${args[@]}"})  # reading and nudging is Haiku work; a later --model from you still wins
   args+=(--disallowedTools Edit Write MultiEdit NotebookEdit)   # no hands: the thread is its only tool
 else
   [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [claude flags...]" >&2; exit 1; }
@@ -74,8 +75,6 @@ $rolefile
 
 Post one line in chatter introducing yourself: your name, your role, the model you are running on, and that you are ready. Then stop." --session-id "$sid" ${args[@]+"${args[@]}"}
 
-wake="New chatter activity at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Reply via chatter if anything needs you, then stop."
-
 if [ "$role" = boss ]; then
   # Timer-driven: silence is the main thing to notice, and a message-driven loop never fires on silence.
   # A message that mentions @boss wakes it early. Bash 3.2's read -t returns 1 on both timeout and EOF,
@@ -97,12 +96,22 @@ if [ "$role" = boss ]; then
     fi
   done
 else
-  # ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
-  # A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
+  # Token discipline: skip messages the PostToolUse hook already delivered mid-turn (its cursor is in the db),
+  # and put the message in the wake prompt so a "nothing for me" wake is one short reply with no tool calls.
+  db=${CHATTER_DB:-$HOME/.chatter/chatter.db}; cursor="notify:${sid:0:8}"
   chatter tail --last 0 --json | while IFS= read -r line; do
     [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
     [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
-    echo "chatter-agent: waking on: ${line:0:120}" >&2
-    turn "$wake" --resume "$sid" ${args[@]+"${args[@]}"}
+    id=$(jq -r .id <<<"$line")
+    seen=$(sqlite3 "$db" "SELECT last_id FROM cursors WHERE name='$cursor'" 2>/dev/null)
+    [[ -n $seen && $id -le $seen ]] && continue        # already seen during the previous turn
+    msg=$(jq -r '"#\(.id)\(if .reply_to then " (re #\(.reply_to))" else "" end) \(.author): \(.body)"' <<<"$line")
+    echo "chatter-agent: waking on: ${msg:0:120}" >&2
+    turn "New chatter message at $(date '+%H:%M'):
+
+$msg
+
+If this needs you (it is addressed to you, affects your work, or asks something you can answer), run 'chatter read --unread' for context and act according to your role. If it does not need you, stop immediately without posting or running anything." --resume "$sid" ${args[@]+"${args[@]}"}
+    sqlite3 "$db" "INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$cursor', MAX($id, COALESCE((SELECT last_id FROM cursors WHERE name='$cursor'), 0)))" 2>/dev/null
   done
 fi

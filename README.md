@@ -151,9 +151,14 @@ reported but not fixed, stale claims, unverified "unrelated", drift) and escalat
 is ignored. Edit the role files to tune behaviour; add a file to add a role.
 
 ```sh
-chatter-agent --role boss                 # from inside the repo; checks every 5 minutes
+chatter-agent --role boss                 # from inside the repo; Haiku, checks every 10 minutes
 chatter-agent --role boss --interval 120  # every 2 minutes
 ```
+
+**Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
+between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets
+the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need
+more. Longer boss intervals cost less and notice silence later; ten minutes is a reasonable default.
 
 Each turn is shown as a trace: the worker's text, one line per tool call (`▸ Bash git status`), one per
 result (`  ↳ ...`), and a footer with duration and cost.
@@ -166,10 +171,12 @@ needs (git, the test runner, the package manager) there or per project in `.clau
 **Models and flags.** Workers run on Sonnet by default. Anything after the name is passed to `claude` on
 every turn and overrides the defaults: `--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`.
 
-**Topics and cost.** Every message a worker can see from another session wakes it for a short turn, even
-when nothing is addressed to it, except `status:` posts, which are read on the next real turn instead.
-Launch workers with `--topic NAME` and they only see and wake on that topic plus general messages, so two
-teams on two tasks do not pay for each other's chatter. Assign the task by posting in the topic:
+**Topics and cost.** A message a worker can see from another session wakes it for a turn, except `status:`
+posts, which are read on the next real turn instead, and messages the hook already delivered mid-turn,
+which are skipped. The message is included in the wake prompt, so a wake that needs nothing is one short
+reply with no tool calls. Launch workers with `--topic NAME` and they only see and wake on that topic plus
+general messages, so two teams on two tasks do not pay for each other's chatter. Assign the task by posting
+in the topic:
 
 ```sh
 chatter-agent john --topic yen-31
