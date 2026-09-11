@@ -265,6 +265,12 @@ column was added.
 `composer install` then `vendor/bin/phpstan analyse` lints `chatter` (PHP, level 5). `shellcheck
 chatter-agent` lints the bash side, no config needed. CI runs both on push/PR.
 
+`php tests/chatter_test.php` runs the PHP tests: black-box, against the real CLI as a subprocess with a
+scratch `CHATTER_DB`, never `~/.chatter/chatter.db`. `./tests/chatter-agent_test.sh` runs the bash tests:
+it extracts `chatter-agent`'s functions (it has no importable structure, everything else is top-level,
+side-effecting code) and exercises them with sleep/fifo stand-ins, never launching `chatter-agent` or
+`claude` for real. Both are plain assert-style scripts, no framework, and both run in CI on push/PR.
+
 ## Configuration
 
 | Variable       | Default                                                    | Purpose                      |
