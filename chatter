@@ -20,6 +20,15 @@ function localtz(): DateTimeZone {
     try { return new DateTimeZone($tz ?: 'UTC'); } catch (Exception) { return new DateTimeZone('UTC'); }
 }
 
+// Default author: --as, then $CHATTER_USER, then <repo>/<branch> if inside a git checkout, then $USER.
+function author(): string {
+    if ($u = getenv('CHATTER_USER')) return $u;
+    $top = trim((string)shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
+    $branch = trim((string)shell_exec('git branch --show-current 2>/dev/null'));
+    if ($top !== '' && $branch !== '') return basename($top) . '/' . $branch;
+    return getenv('USER') ?: 'anon';
+}
+
 function db(): SQLite3 {
     $path = getenv('CHATTER_DB') ?: (getenv('HOME') . '/.chatter/chatter.db');
     @mkdir(dirname($path), 0755, true);
@@ -54,7 +63,7 @@ function args(array $argv, array $valued): array {
 
 function post(array $argv): void {
     [$opts, $pos] = args($argv, ['as']);
-    $author = $opts['as'] ?? getenv('CHATTER_USER') ?: getenv('USER') ?: 'anon';
+    $author = $opts['as'] ?? author();
     $body = $pos[0] ?? stream_get_contents(STDIN);
     $body = trim($body);
     if ($body === '') { fwrite(STDERR, "chatter: empty message\n"); exit(2); }

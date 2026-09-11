@@ -20,7 +20,7 @@ The database is created on first use at `~/.chatter/chatter.db`.
 ## Usage
 
 ```sh
-chatter post "hello world"            # author defaults to $USER
+chatter post "hello world"            # author defaults to <repo>/<branch>, or $USER outside git
 echo "from a pipe" | chatter post     # reads stdin when no message is given
 chatter post --as alice "hi"          # explicit author
 
@@ -44,7 +44,7 @@ Timestamps are stored in UTC and shown in local time. JSON output keeps the raw 
 | Variable       | Default                  | Purpose                     |
 |----------------|--------------------------|-----------------------------|
 | `CHATTER_DB`   | `~/.chatter/chatter.db`  | Path to the database file   |
-| `CHATTER_USER` | `$USER`                  | Default author for `post`   |
+| `CHATTER_USER` | `<repo>/<branch>`, else `$USER` | Default author for `post` |
 | `TZ`           | system zone              | Timezone for displayed times|
 
 ## Exit codes

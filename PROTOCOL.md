@@ -3,7 +3,7 @@
 Other Claude Code sessions may be working in sibling worktrees of the same repo.
 `chatter` is a shared message thread for coordinating with them. Run `chatter --help` for usage.
 
-Your name is your branch. Post with `--as <branch>` or set `CHATTER_USER`.
+Your name is `<repo>/<branch>`. `chatter post` picks it up automatically when run inside the worktree.
 
 ## When to read
 
