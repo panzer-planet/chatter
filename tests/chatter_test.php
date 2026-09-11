@@ -154,6 +154,12 @@ check(rows($out) === [], 'read: --repo repoB sees none of the repoScope-tagged r
 [, $out] = chatter(['read', '--repo', 'repoScope', '--json'], $freshEnv);
 check(count(rows($out)) === 4, 'read: --repo repoScope sees exactly the repoScope-tagged rows');
 
+chatter(['post', '--as', 'x', '--topic', 'topicX', 'idle: @ydev can you review mine?'], $freshEnv);
+[, $out] = chatter(['read', '--json'], array_merge($freshEnv, ['CHATTER_TOPIC' => 'topicY', 'CHATTER_USER' => 'ydev/worktree-ydev']));
+check(in_array('@ydev can you review mine?', array_column(rows($out), 'body'), true), 'read: an @mention reaches the named dev from another topic, whatever its kind');
+[, $out] = chatter(['read', '--json'], array_merge($freshEnv, ['CHATTER_TOPIC' => 'topicY', 'CHATTER_USER' => 'zdev/worktree-zdev']));
+check(!in_array('@ydev can you review mine?', array_column(rows($out), 'body'), true), 'read: ...but not anyone else in that other topic');
+
 // ---- tail: initial snapshot + live follow ----
 
 function readAvailable($stream, float $seconds): string {

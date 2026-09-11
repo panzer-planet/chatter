@@ -29,7 +29,8 @@ Messages can also carry a topic, shown as `#12 [platform] [yen-31]`. If you were
 everything you post lands there automatically and you only see that topic plus untagged messages, plus
 every `done:`, `decision:` and `question:` from any topic in your repo, because dependent tasks need those.
 Untagged messages are for everyone: announcements, protocol changes, questions to the whole team. To reach
-a session on another topic with anything else, post untagged with `--topic ''` and address them by name.
+a session on another topic with anything else, address them by name: a post that says `@name` reaches that
+session from any topic.
 
 ## Sharing code between worktrees
 

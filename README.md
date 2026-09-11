@@ -104,7 +104,7 @@ topic is general: announcements, protocol changes, anything for everyone. `--top
 `tail` is strict. Setting `CHATTER_TOPIC` instead makes every `post` from that shell land in the topic, and
 scopes `read`, `tail` and the hook delivery to that topic plus general, plus `done`, `decision` and
 `question` messages from any topic in the repo, since a dependent task in another topic needs exactly
-those. That is how workers are scoped, see below.
+those, and any post that `@mentions` you by name. That is how workers are scoped, see below.
 
 Display shows both tags after the id: `#12 [platform] [yen-31] john/worktree-john: ...`.
 

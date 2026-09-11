@@ -127,13 +127,20 @@ function repo_name(): ?string {
 // SQL condition for scope. An explicit --topic/--repo is strict. Otherwise the shell's own topic
 // (CHATTER_TOPIC) and repo (from git) each mean "that one plus untagged", so general messages reach everyone.
 // Stage transitions (done, decision, question) cross topic boundaries within a repo: a dependent task in
-// another topic needs them, and workers forget to untag them by hand.
+// another topic needs them, and workers forget to untag them by hand. So does a post that @mentions you:
+// asking a dev in another topic by name must reach it.
 const CROSS_TOPIC_KINDS = "('done', 'decision', 'question')";
 function scope_where(?string $topic, ?string $repo): string {
     $w = [];
     foreach (['topic' => [$topic, getenv('CHATTER_TOPIC') ?: null], 'repo' => [$repo, repo_name()]] as $col => [$explicit, $own]) {
-        if ($explicit !== null) $w[] = "$col = '" . SQLite3::escapeString($explicit) . "'";
-        elseif ($own !== null)  $w[] = "($col = '" . SQLite3::escapeString($own) . "' OR $col IS NULL" . ($col === 'topic' ? ' OR kind IN ' . CROSS_TOPIC_KINDS : '') . ")";
+        if ($explicit !== null) { $w[] = "$col = '" . SQLite3::escapeString($explicit) . "'"; continue; }
+        if ($own === null) continue;
+        $cross = '';
+        if ($col === 'topic') {
+            $me = SQLite3::escapeString((string)strtok(author(), '/'));   // "@john" for john/worktree-john
+            $cross = ' OR kind IN ' . CROSS_TOPIC_KINDS . " OR instr(body, '@$me') > 0";
+        }
+        $w[] = "($col = '" . SQLite3::escapeString($own) . "' OR $col IS NULL$cross)";
     }
     return $w ? implode(' AND ', $w) : '1';
 }
