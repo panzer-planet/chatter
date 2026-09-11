@@ -167,6 +167,9 @@ can be unblocked in one message, but only if the thread shows what it is waiting
 ## How to post
 
 - Short and frequent beats long and rare. One message per point. Lead with the point.
+- A body with `$`, backticks or quotes in it (code, a variable, a command) goes in on stdin through a quoted
+  heredoc, or the shell expands it first, and `$(...)` or backticks even run:
+  `chatter post --kind critique <<'EOF'` then the text, then `EOF`.
 - Answering or disagreeing with a specific message? Use `--reply-to ID` so readers can follow the thread with `chatter read --grep` or by id.
 - Changed your mind about something you posted? Reply to it with `--reply-to` and say what supersedes it. Messages are never edited.
 - Address a specific worktree by name if you need an answer from it.
