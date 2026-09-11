@@ -90,8 +90,9 @@ function db(): SQLite3 {
     return $db;
 }
 
-// Parse argv into ['flag' => value, ...] plus positional args.
-function args(array $argv, array $valued): array {
+// Parse argv into ['flag' => value, ...] plus positional args. An unknown flag is an error: taken as a boolean,
+// a typo like `post --topc tests MSG` would silently post "tests".
+function args(array $argv, array $valued, array $bool = []): array {
     $opts = []; $pos = [];
     for ($i = 0; $i < count($argv); $i++) {
         $a = $argv[$i];
@@ -102,8 +103,10 @@ function args(array $argv, array $valued): array {
         if (in_array($name, $valued, true)) {
             if (!isset($argv[$i + 1])) usage();
             $opts[$name] = $argv[++$i];
-        } else {
+        } elseif (in_array($name, $bool, true)) {
             $opts[$name] = true;
+        } else {
+            fwrite(STDERR, "chatter: unknown option --$name (see chatter --help)\n"); exit(1);
         }
     }
     return [$opts, $pos];
@@ -163,7 +166,7 @@ function post(array $argv): void {
 }
 
 function read(array $argv): void {
-    [$opts] = args($argv, ['since', 'last', 'from', 'grep', 'topic', 'repo', 'kind']);
+    [$opts] = args($argv, ['since', 'last', 'from', 'grep', 'topic', 'repo', 'kind'], ['unread', 'json']);
     $db = db();
     $where = [scope_where($opts['topic'] ?? null, $opts['repo'] ?? null)];
     if (isset($opts['kind']))  $where[] = "kind = '" . SQLite3::escapeString($opts['kind']) . "'";
@@ -173,8 +176,9 @@ function read(array $argv): void {
         $where[] = 'id > ' . (int)$db->querySingle("SELECT COALESCE(last_id, 0) FROM cursors WHERE name = '$me'");
         $db->exec("INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$me', (SELECT COALESCE(MAX(id), 0) FROM messages))");
     }
-    if (isset($opts['from']))  $where[] = "author LIKE '" . SQLite3::escapeString($opts['from']) . "%'";
-    if (isset($opts['grep']))  $where[] = "body LIKE '%" . SQLite3::escapeString($opts['grep']) . "%'";
+    // instr, not LIKE: a % or _ in the text is literal ("--grep 0%" must not match "1000")
+    if (isset($opts['from']))  $where[] = "instr(author, '" . SQLite3::escapeString($opts['from']) . "') = 1";
+    if (isset($opts['grep']))  $where[] = "instr(lower(body), lower('" . SQLite3::escapeString($opts['grep']) . "')) > 0";
     $sql = 'SELECT * FROM messages WHERE ' . implode(' AND ', $where);
     if (isset($opts['last'])) {
         // newest N, then flip back to chronological order
@@ -231,7 +235,7 @@ function notify(): void {
 }
 
 function tail(array $argv): void {
-    [$opts] = args($argv, ['last', 'topic', 'repo', 'kind']);
+    [$opts] = args($argv, ['last', 'topic', 'repo', 'kind'], ['once', 'json']);
     $db = db();
     $ppid = function_exists('posix_getppid') ? posix_getppid() : null;
     $n = (int)($opts['last'] ?? 20);

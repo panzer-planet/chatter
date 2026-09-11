@@ -105,6 +105,15 @@ check(count($fromRows) > 0 && array_reduce($fromRows, fn($ok, $r) => $ok && str_
 [, $out] = chatter(['read', '--grep', 'NEEDLE', '--json']);
 check(count(rows($out)) > 0 && str_contains(rows($out)[0]['body'], 'needle'), 'read: --grep matches case-insensitively');
 
+chatter(['post', '--as', 'carol', 'grep 100% literal']);
+chatter(['post', '--as', 'carol', 'grep 1000 literal']);
+[, $out] = chatter(['read', '--grep', '0%', '--json']);
+check(array_column(rows($out), 'body') === ['grep 100% literal'], 'read: --grep treats % as a literal, not a wildcard');
+
+[$code, , $err] = chatter(['post', '--as', 'bob', '--topc', 'tests', 'lost message']);
+[, $out] = chatter(['read', '--grep', 'lost message', '--json']);
+check($code === 1 && str_contains($err, 'unknown option --topc') && rows($out) === [], 'post: an unknown flag is refused, not posted as a body');
+
 // ---- read: --unread cursor is per author ----
 
 chatter(['post', '--as', 'dave', 'first for dave to read']);
