@@ -234,9 +234,9 @@ if [ "$role" = boss ]; then
         env -u CLAUDE_CODE_SESSION_ID CHATTER_USER= "$0" "$name" $flags </dev/null &
         pending="$pending $name "     # wake the boss when this dev's introduction arrives, so it can assign
         spawned="$spawned $name"
-        say "status: spawned dev '$name'${flags:+ ($flags)}" ;;
+        echo "chatter-agent: spawned dev '$name'${flags:+ ($flags)}" >&2 ;;   # success is log-only: the spawn: line and the dev's intro already say it
       kill)
-        if [ -f "$run/$name.pid" ]; then kill "$(cat "$run/$name.pid")" 2>/dev/null; say "status: killed dev '$name'"
+        if [ -f "$run/$name.pid" ]; then kill "$(cat "$run/$name.pid")" 2>/dev/null; echo "chatter-agent: killed dev '$name'" >&2
         else say "status: refused kill of dev '$name': not running"; fi ;;
     esac
   }

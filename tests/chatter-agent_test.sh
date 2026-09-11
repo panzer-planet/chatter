@@ -149,11 +149,11 @@ stublog_content=$(cat "$STUBLOG")
 
 assert_contains "control rejects a name with a shell metacharacter" "$say_section" "refused"
 assert_contains "control's refusal names the bad input" "$say_section" "bad;name"
-assert_contains "control spawns a well-formed name" "$say_section" "spawned dev 'myname'"
+assert_eq "control posts nothing when a spawn succeeds (the spawn: line already says it)" "$(grep -c "spawned dev" <<<"$say_section")" 0
 assert_contains "control passes the flags through to the re-exec" "$stublog_content" "myname --topic foo"
 assert_contains "control tracks a fresh spawn as pending" "$result" "PENDING=[ myname "
 assert_contains "control refuses a 6th dev once 5 are already running" "$say_section" "refused spawn of dev 'sixth': 4 devs already running"
-assert_contains "control's kill logs success" "$say_section" "killed dev 'target'"
+assert_eq "control posts nothing when a kill succeeds" "$(grep -c "killed dev" <<<"$say_section")" 0
 assert_contains "control's kill actually terminates the process" "$result" "TARGET_KILLED=yes"
 assert_contains "control refuses to kill a name with no pidfile" "$say_section" "refused kill of dev 'nosuchdev': not running"
 

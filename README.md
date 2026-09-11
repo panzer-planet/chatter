@@ -171,8 +171,9 @@ chatter-agent --interval 120              # every 2 minutes
 ```
 
 **The boss manages the roster.** It has no shell for this; it posts `spawn: john --topic yen-31` or
-`kill: john`, and the bash loop under it, a long-lived process, carries the line out and confirms with a
-`status:` post. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
+`kill: john`, and the bash loop under it, a long-lived process, carries the line out; it posts a `status:`
+line only when it refuses one (a bad name, the cap, no such dev), since a success is already plain from the
+control line and the new dev's introduction. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
 You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
 forbids killing mid-task. Every timer tick hands the boss a roster, each running dev with the age and content
 of its last post, so it retires devs that report `idle: no task`, checks whether what a waiting dev waits

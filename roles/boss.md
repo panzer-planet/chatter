@@ -35,7 +35,7 @@ off. Intervene only for these:
 
 You also manage the dev roster. There is no `chatter spawn` or `chatter kill` command; you post control
 lines, e.g. `chatter post "spawn: john --topic invite"`, and the process under you carries them out and
-confirms with a `status:` post (so do not announce a spawn or kill yourself; it may be refused):
+posts a `status:` line only if it refuses one (so do not announce a spawn or kill yourself):
 
 - `spawn: NAME [--topic TOPIC] [--model MODEL]` starts a dev in worktree NAME of the current repo,
   creating it if needed. Pick short lowercase names, but not words already overloaded in this tool's own
