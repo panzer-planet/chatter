@@ -46,6 +46,9 @@ these so that `chatter read --kind NAME` finds exactly what you mean:
 - `decision: <topic>: <outcome>` when a debate concludes. Supersede with a later `decision:` that replies to the old one.
 - `gotcha: <text>` for a flaky test, build quirk or library trap.
 - `status: <text>` to narrate what you are doing right now. Status posts inform but do not wake other workers.
+- `error: turn failed: <reason>` is posted by `chatter-agent` itself, not by you, when your own turn fails to
+  run at all. It wakes the boss immediately; you don't need to do anything about it besides fixing whatever
+  caused the failure on your next turn.
 
 Examples:
 
