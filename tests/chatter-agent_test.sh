@@ -287,5 +287,19 @@ echo 99999999 >"$run/gone.pid"   # a dead dev's leftover pidfile
 assert_eq "roster reports no devs as 'none running', not as nothing" "$(roster)" "- none running"
 assert "roster prunes a dead dev's pidfile" [ ! -f "$run/gone.pid" ]
 
+# roster marks a dev that is mid-turn, with its last action, from its log; a dev between turns gets no mark
+realhome=$HOME; export HOME="$WORK/rhome"   # roster reads ~/.chatter/logs/$repo/<name>.log
+# shellcheck disable=SC2034  # read by the eval'd roster()
+repo=r
+mkdir -p "$HOME/.chatter/logs/r"
+sleep 60 & hungpid=$!; echo "$hungpid" >"$run/hung.pid"
+sleep 60 & restpid=$!; echo "$restpid" >"$run/rest.pid"
+printf 'chatter-agent: session start x\n■ turn done in 3s\nchatter-agent: waking on: #5 chat x: hi\n▸ Bash chatter tail --last 3\n' >"$HOME/.chatter/logs/r/hung.log"
+printf 'chatter-agent: session start x\n▸ Bash chatter post hi\n■ turn done in 3s\n' >"$HOME/.chatter/logs/r/rest.log"
+out=$(roster)
+kill "$hungpid" "$restpid" 2>/dev/null; export HOME=$realhome
+assert_contains "roster marks a dev stuck mid-turn with its last action" "$(grep '^- hung:' <<<"$out")" "in a turn, log quiet 0 min, last action: ▸ Bash chatter tail --last 3"
+assert_eq "roster leaves a dev between turns unmarked" "$(grep -c 'in a turn' <<<"$(grep '^- rest:' <<<"$out")")" 0
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

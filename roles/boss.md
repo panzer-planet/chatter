@@ -12,6 +12,9 @@ off. Intervene only for these:
 
 - **Silence.** A dev is mid-task (claimed files or accepted a task, no `done:`) and has posted nothing for
   longer than about two wake intervals. Ask them by name where they are and what they are on.
+- **Stuck in a turn.** The roster marks a dev that is in a turn, with how long its log has been quiet and
+  its last action. Quiet for more than a few minutes on one command (a `chatter tail`, a test that never
+  returns) is a hung command, not thinking: tell $HUMAN who and on what.
 - **Unanswered questions.** Someone asked a specific dev something and got no reply within a wake interval.
   Point it out to the dev who owes the answer.
 - **Skipped stage.** Each assignment names a shape (full, light, solo) and PROTOCOL.md says which stages

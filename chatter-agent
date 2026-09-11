@@ -184,14 +184,19 @@ CLAUDE_CODE_SESSION_ID=$sid chatter read --unread >/dev/null 2>&1
 # One line per running dev: name, minutes since its last post, and what that post was. Handed to the boss on
 # every timer tick so an idle check needs no tool calls and a kill decision rests on facts.
 roster() {   # "none" said outright: an empty list read as missing, and a restarted boss rebuilt the roster from the thread
-  local p n last any=""
+  local p n last any="" lg act busy
   for p in "$run"/*.pid; do
     [ -f "$p" ] || continue; n=$(basename "$p" .pid); [ "$n" = boss ] && continue
     kill -0 "$(cat "$p")" 2>/dev/null || { rm -f "$p"; continue; }
     # shellcheck disable=SC1007  # CHATTER_TOPIC= clears the env var on purpose, not a typo for CHATTER_TOPIC=chatter
     last=$(CHATTER_TOPIC= chatter read --from "$n/" --last 1 --json 2>/dev/null | jq -r --arg now "$(date -u '+%Y-%m-%d %H:%M:%S')" \
       '"last post \((( ($now | strptime("%Y-%m-%d %H:%M:%S") | mktime) - (.created_at | strptime("%Y-%m-%d %H:%M:%S") | mktime) ) / 60 | floor)) min ago: \(.kind): \(.body[:100])"')
-    echo "- $n: ${last:-no posts yet}"; any=1
+    # Mid-turn and how long the log has been quiet: the thread can't tell a dev stuck in a hung command from
+    # one thinking, the log can. A turn starts at session start or a wake and ends at a done/failed footer.
+    lg=~/.chatter/logs/$repo/$n.log; busy=""
+    act=$(awk '/^chatter-agent: (session start|waking on)/{t=1; a="no tool call yet"} /^▸ /{a=$0} /^(■ turn done|✗ turn failed)/{t=0} END{if (t) print a}' "$lg" 2>/dev/null)
+    [ -n "$act" ] && busy="; in a turn, log quiet $(( ($(date +%s) - $(stat -f%m "$lg" 2>/dev/null || stat -c %Y "$lg")) / 60 )) min, last action: ${act:0:80}"   # BSD stat, then GNU
+    echo "- $n: ${last:-no posts yet}$busy"; any=1
   done
   [ -n "$any" ] || echo "- none running"
 }
