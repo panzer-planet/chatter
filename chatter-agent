@@ -1,31 +1,54 @@
 #!/usr/bin/env bash
-# chatter-agent: a headless Claude Code worker that wakes whenever another session posts to chatter.
+# chatter-agent: a Claude Code session that nobody types into. It talks through chatter and is woken
+# for a turn when there is something to react to. What it does on a wake is defined by its role file.
 #
-# usage: chatter-agent <worktree-dir | worktree-name> [extra claude flags...]
-#   e.g. chatter-agent john &        (from inside the repo: resolves .claude/worktrees/john)
+# usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [claude flags...]   a dev, woken by posts
+#        chatter-agent --role boss [--interval SECONDS] [claude flags...]              a boss, woken by a timer
 #
-# Output goes to ~/.chatter/<name>.log. Talk to it through chatter: chatter post "@repo/branch: do X".
-# Stop it with: pkill -f "chatter-agent <name>"
+#   e.g. chatter-agent john              from inside a repo: uses .claude/worktrees/john, creating it if needed
+#        chatter-agent --role boss       from inside a repo: watches the devs, posts as "boss"
+#
+# Output goes to the terminal and to ~/.chatter/<name>.log. Stop with Ctrl-C or: pkill -f "chatter-agent john"
 set -uo pipefail
-dir=${1:?usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]}; shift
-if [ ! -d "$dir" ]; then
-  name=$dir; dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$name"
-  if [ ! -d "$dir" ]; then  # create it, branching from HEAD; reuse the branch if it already exists
-    git worktree add -q "$dir" -b "worktree-$name" 2>/dev/null || git worktree add -q "$dir" "worktree-$name" \
-      || { echo "chatter-agent: could not create worktree $name" >&2; exit 1; }
-    echo "chatter-agent: created worktree $dir on branch worktree-$name"
+
+roles=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/roles
+role=dev; interval=300; dir=""; args=()
+[[ $# -gt 0 && $1 != --* ]] && { dir=$1; shift; }
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --role) role=$2; shift 2 ;;
+    --interval) interval=$2; shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+[ -f "$roles/$role.md" ] || { echo "chatter-agent: unknown role '$role' (no $roles/$role.md)" >&2; exit 1; }
+
+if [ "$role" = boss ]; then
+  name=boss
+  export CHATTER_USER=boss                      # the boss has no worktree; it posts under its role name
+  args+=(--disallowedTools Edit Write MultiEdit NotebookEdit)   # no hands: the thread is its only tool
+else
+  [ -n "$dir" ] || { echo "usage: chatter-agent <worktree-dir | worktree-name> [--role dev] [claude flags...]" >&2; exit 1; }
+  if [ ! -d "$dir" ]; then
+    name=$dir; dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$name"
+    if [ ! -d "$dir" ]; then  # create it, branching from HEAD; reuse the branch if it already exists
+      git worktree add -q "$dir" -b "worktree-$name" 2>/dev/null || git worktree add -q "$dir" "worktree-$name" \
+        || { echo "chatter-agent: could not create worktree $name" >&2; exit 1; }
+      echo "chatter-agent: created worktree $dir on branch worktree-$name"
+    fi
   fi
+  cd "$dir" || exit 1
+  name=$(basename "$dir")
 fi
-cd "$dir" || exit 1
+
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
-log=~/.chatter/$(basename "$dir").log
+log=~/.chatter/$name.log
 human=$(jq -r '.human // "the user"' ~/.chatter/config.json 2>/dev/null || echo "the user")
-echo "chatter-agent: $(basename "$dir") logging to $log"
+rolefile=$(sed -e "s/\$HUMAN/$human/g" -e "s/\$INTERVAL/$((interval / 60)) minutes/g" "$roles/$role.md")
+
+echo "chatter-agent: $name ($role) logging to $log"
 if [ -t 1 ]; then exec > >(tee -a "$log") 2>&1; else exec >>"$log" 2>&1; fi   # terminal: show and log; background: log only
 
-# Headless sessions have nobody to approve tool calls, so chatter itself must be pre-allowed.
-# Anything else the worker needs (edits, git, tests) comes from the flags you pass, e.g.
-# --permission-mode acceptEdits --allowedTools "Bash(git *)" "Bash(npm *)"
 # Render claude's stream-json into a readable trace: the worker's text, one line per tool call and result, a footer per turn.
 show() {
   jq --unbuffered -r '
@@ -43,14 +66,41 @@ show() {
 # Defaults to Sonnet; a --model in the extra flags comes later on the command line and wins.
 turn() { claude -p "$1" --model sonnet --allowedTools "Bash(chatter *)" --output-format stream-json --verbose "${@:2}" </dev/null | show; }
 
-echo "chatter-agent: session $sid in $dir" >&2
-turn "You are a chatter worker, an AI session named after your worktree. You are not the human. The human who owns this machine and reads the thread is $human, who posts under that name; never speak as $human, sign that name, or use their account details as your own. Your identity is the author name chatter fills in automatically. Your terminal output is visible but nobody types into it: instructions, questions and answers all go through chatter, and you are woken for a turn whenever someone else posts. Post one line introducing yourself: your worktree, the model you are running on, and that you are waiting for tasks. Then stop." --session-id "$sid" "$@"
+turn "Your role:
 
-# ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
-# A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
-chatter tail --last 0 --json | while IFS= read -r line; do
-  [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
-  [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
-  echo "chatter-agent: waking on: ${line:0:120}" >&2
-  turn "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. While you work, narrate in one-liners tagged 'status:' whenever you start on a distinct piece, change approach, run tests, get stuck or finish a piece. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement." --resume "$sid" "$@"
-done
+$rolefile
+
+Post one line in chatter introducing yourself: your name, your role, the model you are running on, and that you are ready. Then stop." --session-id "$sid" ${args[@]+"${args[@]}"}
+
+wake="New chatter activity at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Reply via chatter if anything needs you, then stop."
+
+if [ "$role" = boss ]; then
+  # Timer-driven: silence is the main thing to notice, and a message-driven loop never fires on silence.
+  # A message that mentions @boss wakes it early. Bash 3.2's read -t returns 1 on both timeout and EOF,
+  # so the tail runs behind a fifo and its liveness tells the two apart.
+  fifo=$(mktemp -u); mkfifo "$fifo"
+  chatter tail --last 0 --json >"$fifo" & tailpid=$!
+  trap 'kill $tailpid 2>/dev/null; rm -f "$fifo"' EXIT
+  exec 3<"$fifo"
+  while true; do
+    if IFS= read -r -t "$interval" line <&3; then
+      [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
+      [[ $line == *"@boss"* ]] || continue
+      echo "chatter-agent: waking on mention: ${line:0:120}" >&2
+      turn "Someone mentioned @boss at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+    elif kill -0 "$tailpid" 2>/dev/null; then
+      turn "Timer check at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Post nothing unless one of your triggers applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+    else
+      break   # tail ended
+    fi
+  done
+else
+  # ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
+  # A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
+  chatter tail --last 0 --json | while IFS= read -r line; do
+    [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
+    [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
+    echo "chatter-agent: waking on: ${line:0:120}" >&2
+    turn "$wake" --resume "$sid" ${args[@]+"${args[@]}"}
+  done
+fi

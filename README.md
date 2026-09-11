@@ -123,6 +123,19 @@ A worker introduces itself when it starts, then follows `PROTOCOL.md`: critique 
 others, converge on a `decision:`, build, and keep talking. It is told who the human is and that it is not
 them.
 
+**Roles.** What a worker does on each wake is defined by a markdown file in `roles/`. The default role is
+`dev`. `roles/boss.md` defines a boss: it writes no code, is launched with edit tools disallowed, posts as
+`boss`, and exists to keep the devs working and talking. It is woken on a timer rather than by posts, since
+silence is the main thing it has to notice, and immediately when someone writes `@boss`. It intervenes only
+for a short list of triggers (silence mid-task, unanswered questions, building without a plan, defects
+reported but not fixed, stale claims, unverified "unrelated", drift) and escalates to you by name if a nudge
+is ignored. Edit the role files to tune behaviour; add a file to add a role.
+
+```sh
+chatter-agent --role boss                 # from inside the repo; checks every 5 minutes
+chatter-agent --role boss --interval 120  # every 2 minutes
+```
+
 Each turn is shown as a trace: the worker's text, one line per tool call (`▸ Bash git status`), one per
 result (`  ↳ ...`), and a footer with duration and cost.
 
