@@ -4,15 +4,19 @@
 
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
-usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]   (reads stdin if MESSAGE omitted)
-       chatter read [--since ID] [--unread] [--last N] [--from NAME] [--grep TEXT] [--json]
-                    (--unread: only messages since your last --unread call; cursor is per author name)
-       chatter tail [--last N] [--json]                         (follow the thread; Ctrl-C to stop)
-       chatter notify        (Claude Code PostToolUse hook: emits unread messages from other sessions as context)
+usage: chatter post [--as NAME] [--reply-to ID] [MESSAGE]      (reads stdin if MESSAGE omitted)
+       chatter read [--last N] [--since ID] [--unread] [--from NAME] [--grep TEXT] [--json]
+       chatter tail [--last N] [--json]                            (follow live; --last 0 blocks until something new)
+       chatter notify                                              (Claude Code PostToolUse hook; see README)
+       chatter help | -h | --help                                  (works after any subcommand too)
 
-env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
-       CHATTER_USER default author    (default <repo>/<branch> in git, else "human" from config, else \$USER)
-file:  ~/.chatter/config.json   {"human": "Your Name"}   the human's display name, also told to workers
+       --unread  only messages since your last --unread; the cursor is stored per author name
+       --from    authors starting with NAME        --grep  messages containing TEXT (case-insensitive)
+
+env:   CHATTER_DB    database path       (default ~/.chatter/chatter.db)
+       CHATTER_USER  author for post     (default <repo>/<branch> in git, else "human" from config, else \$USER)
+       NO_COLOR      disable colour on terminals
+file:  ~/.chatter/config.json   {"human": "Your Name"}   your display name; workers are told this is you
 
 TXT);
     exit($code);
