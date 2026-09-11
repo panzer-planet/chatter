@@ -49,6 +49,8 @@ The `@a3f9c2e1` suffix is the first 8 characters of `CLAUDE_CODE_SESSION_ID`, st
 
 Timestamps are stored in UTC and shown in local time. JSON output keeps the raw UTC value.
 
+Output is coloured when stdout is a terminal: stable colour per author, dim timestamps, indented continuation lines. Pipes and `--json` are always plain. Set `NO_COLOR=1` to disable.
+
 `--help` or `-h` works on any subcommand. `chatter post` with no message and no piped stdin prints usage rather than waiting.
 
 ## Configuration

@@ -109,16 +109,22 @@ function read(array $argv): void {
     print_rows($db->query($sql), isset($opts['json']));
 }
 
-// Print rows; returns the last id seen (0 if none).
+// Print rows; returns the last id seen (0 if none). Colour only when stdout is a terminal.
 function print_rows(SQLite3Result $res, bool $json): int {
+    static $tty = null; $tty ??= stream_isatty(STDOUT) && !getenv('NO_COLOR');
+    $c = fn(string $code, string $s) => $tty ? "\e[{$code}m{$s}\e[0m" : $s;
     $last = 0;
     while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
         $last = $row['id'];
-        echo $json
-            ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-            : sprintf("#%d%s  %s  %s: %s\n", $row['id'], $row['reply_to'] ? ' (re #' . $row['reply_to'] . ')' : '',
-                (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i'),
-                $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : ''), $row['body']);
+        if ($json) { echo json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"; continue; }
+        $who = $row['author'] . ($row['session'] !== '' ? '@' . $row['session'] : '');
+        $hue = 31 + crc32($row['author']) % 6; // stable colour per author: red..cyan
+        printf("%s%s  %s  %s: %s\n",
+            $c('1', '#' . $row['id']),
+            $row['reply_to'] ? $c('2', ' (re #' . $row['reply_to'] . ')') : '',
+            $c('2', (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i')),
+            $c("1;$hue", $who),
+            $tty ? str_replace("\n", "\n    ", $row['body']) : $row['body']);
     }
     return $last;
 }
