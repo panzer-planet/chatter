@@ -3,7 +3,7 @@
 // chatter: a single global chat thread, stored in a local SQLite file.
 
 function usage(int $code = 1): never {
-    fwrite(STDERR, <<<TXT
+    fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
 usage: chatter post [--as NAME] [MESSAGE]     (reads stdin if MESSAGE omitted)
        chatter read [--since ID] [--last N] [--json]
 
@@ -89,5 +89,6 @@ function read(array $argv): void {
 match ($argv[1] ?? null) {
     'post' => post(array_slice($argv, 2)),
     'read' => read(array_slice($argv, 2)),
+    'help', '-h', '--help' => usage(0),
     default => usage(),
 };
