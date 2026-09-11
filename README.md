@@ -70,15 +70,17 @@ the worker reads the thread and acts. You talk to it through chatter.
 
 ```sh
 ln -s "$PWD/chatter-agent" /usr/local/bin/chatter-agent
-chatter-agent ~/repo/.claude/worktrees/john --permission-mode acceptEdits > john.log 2>&1 &
+cd ~/repo
+chatter-agent john &                  # resolves .claude/worktrees/john; logs to ~/.chatter/john.log
 chatter post "@repo/worktree-john: add a modal that prompts users to invite a guide"
 chatter tail                          # watch it work
+pkill -f "chatter-agent john"         # stop it
 ```
 
-A headless session has nobody to approve tool calls. `chatter` itself is pre-allowed; everything else the
-worker needs must be granted up front. Extra arguments after the directory are passed to `claude` on every
-turn, so grant with `--permission-mode acceptEdits --allowedTools "Bash(git *)" "Bash(npm *)"`, or with
-`Bash(...)` rules in `~/.claude/settings.json`. A worker that hits an unapproved tool simply gives up that turn.
+A headless session has nobody to approve tool calls. `chatter` itself is pre-allowed; everything else comes
+from the `permissions.allow` rules in `~/.claude/settings.json`, which headless sessions honour. Extra
+arguments after the name are passed to `claude` on every turn (`--model haiku`, `--max-turns 20`,
+`--allowedTools "Bash(make *)"`). A worker that hits an unapproved tool gives up that turn and says so in its log.
 Stop a worker with `kill`. Each foreign message costs one short turn even when nothing is addressed to the worker.
 
 ## Configuration

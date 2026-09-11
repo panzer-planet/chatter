@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # chatter-agent: a headless Claude Code worker that wakes whenever another session posts to chatter.
 #
-# usage: chatter-agent <worktree-dir> [extra claude flags...]
-#   e.g. chatter-agent ~/repo/.claude/worktrees/john --permission-mode acceptEdits > john.log 2>&1 &
+# usage: chatter-agent <worktree-dir | worktree-name> [extra claude flags...]
+#   e.g. chatter-agent john &        (from inside the repo: resolves .claude/worktrees/john)
 #
-# Talk to it through chatter: chatter post "@repo/branch: do X". Stop it with kill or Ctrl-C.
+# Output goes to ~/.chatter/<name>.log. Talk to it through chatter: chatter post "@repo/branch: do X".
+# Stop it with: pkill -f "chatter-agent <name>"
 set -uo pipefail
-dir=${1:?usage: chatter-agent <worktree-dir> [claude flags...]}; shift
+dir=${1:?usage: chatter-agent <worktree-dir | worktree-name> [claude flags...]}; shift
+[ -d "$dir" ] || dir="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worktrees/$dir"
+cd "$dir" || { echo "chatter-agent: no such worktree: $dir" >&2; exit 1; }
 sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
-cd "$dir" || exit 1
+log=~/.chatter/$(basename "$dir").log
+echo "chatter-agent: $(basename "$dir") logging to $log"
+exec >>"$log" 2>&1
 
 # Headless sessions have nobody to approve tool calls, so chatter itself must be pre-allowed.
 # Anything else the worker needs (edits, git, tests) comes from the flags you pass, e.g.
