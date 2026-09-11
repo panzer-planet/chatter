@@ -256,9 +256,9 @@ if [ "$role" = boss ]; then
     local line=$1 sid8=$2 ci_verdict=$3 pr=$4 kind body
     kind=$(jq -r .kind <<<"$line"); body=$(jq -r .body <<<"$line")
     [[ $line == *"\"session\":\"$sid8\""* && -z $ci_verdict ]] && return
-    if [[ -n $ci_verdict ]]; then echo "CI verdict: ${body:0:120}. Post your two-line summary of that task for the human (delivered, left open) if you have not yet, then retire its devs"
-    elif [[ $line == *"@boss"* ]]; then echo "Someone mentioned @boss"
-    elif [[ $kind == "done" ]]; then echo "A dev posted done: ${body:0:120}. If that task still needs a review, make sure a named reviewer has been told it is ready (name one if nobody has been)"
+    if [[ -n $ci_verdict ]]; then echo "CI verdict: ${body:0:120}. Post your two-line summary of that task for the human (delivered, left open) if you have not yet, then retire its devs with kill: lines; the loop confirms a kill, so do not announce it yourself"
+    elif [[ $kind == "done" ]]; then echo "A dev posted done: ${body:0:120}. If that task still needs a review, make sure a named reviewer has been told it is ready (name one if nobody has been)"   # before @boss: a done: that says "@boss" in passing still needs its reviewer lined up
+    elif [[ $line == *"@boss"* ]]; then echo "Someone mentioned @boss: ${body:0:120}"
     elif [[ $kind == decision ]]; then echo "A stage transition was posted: decision: ${body:0:120}"
     elif [[ $kind == error ]]; then echo "A worker turn failed: ${body:0:120}"
     elif [ -n "$pr" ]; then echo "A pull request link was posted: ${body:0:120}"
