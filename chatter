@@ -1,0 +1,85 @@
+#!/usr/bin/env php
+<?php
+// chatter: a single global chat thread, stored in a local SQLite file.
+
+function usage(int $code = 1): never {
+    fwrite(STDERR, <<<TXT
+usage: chatter post [--as NAME] [MESSAGE]     (reads stdin if MESSAGE omitted)
+       chatter read [--since ID] [--last N] [--json]
+
+env:   CHATTER_DB   path to database  (default ~/.chatter/chatter.db)
+       CHATTER_USER default author    (default \$USER)
+
+TXT);
+    exit($code);
+}
+
+function db(): SQLite3 {
+    $path = getenv('CHATTER_DB') ?: (getenv('HOME') . '/.chatter/chatter.db');
+    @mkdir(dirname($path), 0755, true);
+    $db = new SQLite3($path);
+    $db->busyTimeout(2000);
+    $db->exec('PRAGMA journal_mode=WAL');
+    $db->exec('CREATE TABLE IF NOT EXISTS messages (
+        id         INTEGER PRIMARY KEY,
+        author     TEXT NOT NULL,
+        body       TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
+    )');
+    return $db;
+}
+
+// Parse argv into ['flag' => value, ...] plus positional args.
+function args(array $argv, array $valued): array {
+    $opts = []; $pos = [];
+    for ($i = 0; $i < count($argv); $i++) {
+        $a = $argv[$i];
+        if (!str_starts_with($a, '--')) { $pos[] = $a; continue; }
+        $name = substr($a, 2);
+        if (in_array($name, $valued, true)) {
+            if (!isset($argv[$i + 1])) usage();
+            $opts[$name] = $argv[++$i];
+        } else {
+            $opts[$name] = true;
+        }
+    }
+    return [$opts, $pos];
+}
+
+function post(array $argv): void {
+    [$opts, $pos] = args($argv, ['as']);
+    $author = $opts['as'] ?? getenv('CHATTER_USER') ?: getenv('USER') ?: 'anon';
+    $body = $pos[0] ?? stream_get_contents(STDIN);
+    $body = trim($body);
+    if ($body === '') { fwrite(STDERR, "chatter: empty message\n"); exit(2); }
+
+    $st = db()->prepare('INSERT INTO messages (author, body) VALUES (:a, :b)');
+    $st->bindValue(':a', $author);
+    $st->bindValue(':b', $body);
+    $st->execute();
+}
+
+function read(array $argv): void {
+    [$opts] = args($argv, ['since', 'last']);
+    $sql = 'SELECT id, author, body, created_at FROM messages';
+    if (isset($opts['since'])) $sql .= ' WHERE id > ' . (int)$opts['since'];
+    if (isset($opts['last'])) {
+        // newest N, then flip back to chronological order
+        $sql = "SELECT * FROM ($sql ORDER BY id DESC LIMIT " . (int)$opts['last'] . ') ORDER BY id';
+    } else {
+        $sql .= ' ORDER BY id';
+    }
+
+    $res = db()->query($sql);
+    while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
+        echo isset($opts['json'])
+            ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
+            : sprintf("#%d  %s  %s: %s\n", $row['id'], $row['created_at'], $row['author'], $row['body']);
+    }
+}
+
+match ($argv[1] ?? null) {
+    'post' => post(array_slice($argv, 2)),
+    'read' => read(array_slice($argv, 2)),
+    default => usage(),
+};
