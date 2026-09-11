@@ -117,7 +117,7 @@ cleanup() {
   trap '' TERM    # which silently breaks every word split below: the pid list, the spawned names. Found in the wild.
   [ "$(ps -o pgid= -p $$ | tr -d ' ')" = "$$" ] && kill -TERM -- -$$ 2>/dev/null
   local n; for n in $spawned; do [ -f "$run/$n.pid" ] && kill "$(cat "$run/$n.pid")" 2>/dev/null; done
-  killtree $$; rm -f "$pidfile" ${fifo:+"$fifo"}
+  killtree $$; rm -f "$pidfile" "$run/$name.topic" ${fifo:+"$fifo"}
 }
 trap cleanup EXIT
 trap 'exit 143' TERM INT HUP

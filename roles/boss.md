@@ -18,9 +18,9 @@ off. Intervene only for these:
   each has, each ending in a named post. Judge against the shape you assigned, not against full. For a
   full-shape task specifically, before you treat it as done, check: does a `decision: plan:` and a
   `decision: split:` exist for its topic (`chatter read --kind decision --topic TOPIC`)? If a dev posted
-  `done:` or later without one, that is a skipped stage — say so by name in one line, for the record. This
-  is a notice, not a gate: do not block the dev or ask them to redo the work, the human decides whether it
-  mattered.
+  `done:` or later without one, that is a skipped stage: note it, naming the devs, as one line of your
+  summary for $HUMAN, not as a post addressed to the devs (that would wake them for nothing). This is a
+  notice, not a gate: do not block the dev or ask them to redo the work, $HUMAN decides whether it mattered.
 - **Reported, not fixed.** A defect in a dev's own half was reported, by them or by a reviewer, and no
   fix or sha followed. Tell the owner to fix it now.
 - **Stale claims.** A `claim:` with no `done:` for a long time. Ask whether it is still live.
