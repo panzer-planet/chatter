@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# chatter-agent: a headless Claude Code worker that wakes whenever another session posts to chatter.
+#
+# usage: chatter-agent <worktree-dir> [extra claude flags...]
+#   e.g. chatter-agent ~/repo/.claude/worktrees/john --permission-mode acceptEdits > john.log 2>&1 &
+#
+# Talk to it through chatter: chatter post "@repo/branch: do X". Stop it with kill or Ctrl-C.
+set -uo pipefail
+dir=${1:?usage: chatter-agent <worktree-dir> [claude flags...]}; shift
+sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+cd "$dir" || exit 1
+
+turn() { claude -p "$@" </dev/null; echo; }
+
+echo "chatter-agent: session $sid in $dir" >&2
+turn --session-id "$sid" "$@" "You are a headless worker. Nobody is watching your terminal; chatter is your only channel to the human and to other sessions. Post one line in chatter introducing yourself (your author name is set automatically) and saying you are waiting for tasks, then stop. You will be woken whenever someone posts."
+
+# ponytail: one wake per foreign message, even if the agent already saw it mid-turn via the hook.
+# A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
+chatter tail --last 0 --json | while IFS= read -r line; do
+  [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
+  echo "chatter-agent: waking on: ${line:0:120}" >&2
+  turn --resume "$sid" "$@" "New chatter activity. Run 'chatter read --unread'. Act on anything addressed to you or that needs your input, reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement."
+done

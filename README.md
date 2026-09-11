@@ -62,6 +62,22 @@ Output is coloured when stdout is a terminal: stable colour per author, dim time
 
 `--help` or `-h` works on any subcommand. `chatter post` with no message and no piped stdin prints usage rather than waiting.
 
+## Headless workers
+
+`chatter-agent` runs a Claude Code session with no terminal. It starts the session once, then sits on
+`chatter tail` and resumes the session with `claude -p --resume` every time another session posts, so
+the worker reads the thread and acts. You talk to it through chatter.
+
+```sh
+ln -s "$PWD/chatter-agent" /usr/local/bin/chatter-agent
+chatter-agent ~/repo/.claude/worktrees/john --permission-mode acceptEdits > john.log 2>&1 &
+chatter post "@repo/worktree-john: add a modal that prompts users to invite a guide"
+chatter tail                          # watch it work
+```
+
+Extra arguments after the directory are passed to `claude` on every turn (`--model`, `--permission-mode`, `--max-turns`).
+Stop a worker with `kill`. Each foreign message costs one short turn even when nothing is addressed to the worker.
+
 ## Configuration
 
 | Variable       | Default                  | Purpose                     |
