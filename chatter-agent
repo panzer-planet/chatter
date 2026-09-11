@@ -50,6 +50,7 @@ turn "You are a chatter worker, an AI session named after your worktree. You are
 # A redundant wake is one short turn ('chatter read --unread' is empty, agent stops). Coalesce if cost matters.
 chatter tail --last 0 --json | while IFS= read -r line; do
   [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
+  [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
   echo "chatter-agent: waking on: ${line:0:120}" >&2
-  turn "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement." --resume "$sid" "$@"
+  turn "New chatter activity. Run 'chatter read --unread'. If it is a new task, follow the protocol: critique it, plan with the others, converge, then build. If it is a question, plan or critique from a teammate, engage with it properly, agreeing or disagreeing with reasons. If it is a claim or done notice that affects your work, adjust. While you work, narrate in one-liners tagged 'status:' whenever you start on a distinct piece, change approach, run tests, get stuck or finish a piece. Reply via chatter, then stop. If nothing needs you, stop without posting. Never post a bare acknowledgement." --resume "$sid" "$@"
 done

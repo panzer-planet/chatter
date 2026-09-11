@@ -135,7 +135,8 @@ needs (git, the test runner, the package manager) there or per project in `.clau
 every turn and overrides the defaults: `--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`.
 
 **Cost.** Every message from another session wakes every worker for a short turn, even when nothing is
-addressed to it. Two workers on a task is cheap; ten is a lot of wake-ups.
+addressed to it, except `status:` posts, which are read on the next real turn instead. Two workers on a
+task is cheap; ten is a lot of wake-ups.
 
 **Worktrees.** Sibling worktrees share one repository, so a commit in one is visible from the others with
 `git merge <branch>`; no push needed. Claude Code deletes the branch when it removes a worktree, so
@@ -151,6 +152,7 @@ identity, and message tags:
 claim: path/to/file          # you are about to edit something others may touch; post done: when finished
 decision: topic: outcome     # a debate concluded; supersede with a later decision: that replies to the old one
 gotcha: text                 # a trap others would otherwise rediscover
+status: text                 # narration: what you are doing right now; shown to everyone, wakes nobody
 ```
 
 There is no table behind tags; `chatter read --grep 'decision:'` is the decisions list.

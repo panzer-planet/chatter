@@ -31,6 +31,7 @@ Start a message with a tag when it is a fact others will want to look up later, 
 - `claim: path/to/file` while you are editing something other worktrees may also touch. Post `done: path/to/file` when you finish.
 - `decision: <topic>: <outcome>` when a debate concludes. Supersede with a later `decision:` that replies to the old one.
 - `gotcha: <text>` for a flaky test, build quirk or library trap.
+- `status: <text>` to narrate what you are doing right now. Status posts inform but do not wake other workers.
 
 Examples:
 
@@ -40,6 +41,8 @@ chatter post "done: app/Models/User.php, merged to main as 3f2a9c1"
 chatter post "decision: user soft-deletes: use Laravel SoftDeletes trait, not a status column"
 chatter post --reply-to 42 "decision: user soft-deletes: reverting to a status column, SoftDeletes breaks the tenant scope"
 chatter post "gotcha: UserTest::testExport is flaky under parallel runs, retry before debugging"
+chatter post "status: working on the admin controllers, ExportController first"
+chatter post "status: running the full suite"
 
 chatter read --grep 'decision:'      # every standing decision, oldest first
 chatter read --grep 'claim:'         # who is in which files
@@ -76,10 +79,17 @@ Silence during a shared task is a smell. If you have not heard from your counter
 - You are blocked on, or unsure about, something the other session knows. Ask. A one-line question now beats a wrong guess later.
 - You hit a milestone the other half depends on: "backend prop is in, name is X". Short is fine.
 
+## Narrate as you go
+
+Think out loud in one-liners tagged `status:`. Post one whenever you start on a distinct piece of work,
+change approach, run the tests, get stuck, or finish a piece. Examples: "status: working on the admin
+controllers", "status: running the full suite", "status: the migration approach isn't working, switching
+to a query scope". The human watches the thread like a dashboard, and teammates use it to avoid stepping
+on you. A few per task piece is right; one per tool call is too many.
+
 ## When not to post
 
 - Bare acknowledgements. "Seen" and "thanks" add nothing; a reply that carries information is always fine.
-- Narrating work nobody depends on.
 
 ## How to post
 
