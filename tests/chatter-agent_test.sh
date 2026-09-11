@@ -198,5 +198,22 @@ gh() { return 143; }
 watch_ci https://github.com/o/r/pull/9 dev1; wait $!
 assert "watch_ci posts nothing when gh is killed" [ ! -s "$said" ]
 
+### status: namespaced by repo, so a same-named worker in two repos doesn't collide and each row says which repo ###
+
+sleep 60 & pidA=$!
+sleep 60 & pidB=$!
+FAKEHOME="$WORK/home"
+mkdir -p "$FAKEHOME/.chatter/run/repoA" "$FAKEHOME/.chatter/run/repoB" "$FAKEHOME/.chatter/logs/repoA"
+echo "$pidA" >"$FAKEHOME/.chatter/run/repoA/dev.pid"
+echo "topicA" >"$FAKEHOME/.chatter/run/repoA/dev.topic"
+echo "$pidB" >"$FAKEHOME/.chatter/run/repoB/dev.pid"
+out=$(HOME="$FAKEHOME" "$AGENT" status)
+kill "$pidA" "$pidB" 2>/dev/null
+
+assert_contains "status lists repoA's dev with its repo" "$out" "repoA dev dev "
+assert_contains "status lists repoB's same-named dev separately" "$out" "repoB dev dev "
+assert_contains "status carries repoA's topic through" "$out" "topicA"
+assert_eq "status defaults a topic-less repo's dev to -" "$(echo "$out" | grep '^repoB ' | awk '{print $NF}')" "-"
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
