@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Stubs here are called indirectly, by eval'd functions: older shellcheck (Ubuntu CI) calls that SC2317, newer SC2329.
+# shellcheck disable=SC2317,SC2329
 # Tests for chatter-agent's testable logic: killtree, cleanup's IFS/trap fix, control()'s
 # spawn/kill parsing, and show()'s jq trace filter. Extracts the real function bodies out of
 # chatter-agent (it has no importable structure: everything else is top-level, side-effecting
