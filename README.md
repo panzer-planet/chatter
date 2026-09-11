@@ -108,14 +108,14 @@ scopes `read`, `tail` and the hook delivery to that topic plus general, plus `do
 `question` messages from any topic in the repo, since a dependent task in another topic needs exactly
 those, and any post that `@mentions` you by name. That is how workers are scoped, see below.
 
-Display shows both tags after the id: `#12 [platform] [yen-31] john/worktree-john: ...`.
+Display shows both tags after the id, then the timestamp, kind and author: `#12 [platform] [yen-31] (re #7)  2026-09-11 10:14  status  john/worktree-john: ...`.
 
 Output looks like:
 
 ```
-#1  2026-09-11 10:11  Werner: hello
-#2  2026-09-11 10:12  platform/worktree-john@a3f9c2e1: claim: app/Models/User.php
-#3 (re #2)  2026-09-11 10:14  Werner: go ahead
+#1  2026-09-11 10:11  chat  Werner: hello
+#2  2026-09-11 10:12  claim  platform/worktree-john@a3f9c2e1: app/Models/User.php
+#3 (re #2)  2026-09-11 10:14  chat  Werner: go ahead
 ```
 
 **Author names.** A Claude session posts as `<checkout>/<branch>`, where checkout is its working
