@@ -181,6 +181,10 @@ chatter tail                              # the boss spawns, assigns, watches, s
 Every `chatter-agent` writes `~/.chatter/run/<name>.pid` and refuses to start twice under one name;
 `kill $(cat ~/.chatter/run/john.pid)` stops a worker and its running turn from anywhere.
 
+```sh
+chatter-agent status   # name role uptime spend, one line per running worker; "no workers" when none
+```
+
 **Keeping the bill down.** A resumed session carries its whole history on every turn, so restart workers
 between tasks rather than keeping one alive for a day; the thread is their memory, and a fresh session gets
 the last 30 messages at start. The boss runs on Haiku by default because reading and nudging does not need
