@@ -124,8 +124,17 @@ if [ "$role" = boss ]; then
   pending=" "
 
   open_tail
+  # Wall-clock timer. read -t restarts its countdown on every line, and a busy thread delivers lines
+  # constantly, so the deadline is computed from the clock and each read only waits for what is left of it.
+  next=$(( $(date +%s) + interval ))
   while true; do
-    if IFS= read -r -t "$interval" line <&3; then
+    now=$(date +%s)
+    if [ "$now" -ge "$next" ]; then   # checked before every read, so steady traffic cannot starve it
+      echo "chatter-agent: timer check" >&2
+      turn "Timer check at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Post nothing unless one of your triggers applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      next=$(( $(date +%s) + interval )); continue
+    fi
+    if IFS= read -r -t "$(( next - now ))" line <&3; then
       body=$(jq -r .body <<<"$line")
       if [[ $body == spawn:\ * || $body == kill:\ * ]]; then
         [[ $line == *"\"session\":\"${sid:0:8}\""* || $line == *"\"session\":\"\""* ]] && control "$body"
@@ -143,7 +152,7 @@ if [ "$role" = boss ]; then
       echo "chatter-agent: waking on mention: ${line:0:120}" >&2
       turn "Someone mentioned @boss at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
     elif kill -0 "$tailpid" 2>/dev/null; then
-      turn "Timer check at $(date '+%H:%M'). Run 'chatter read --unread' and act according to your role. Post nothing unless one of your triggers applies. Then stop." --resume "$sid" ${args[@]+"${args[@]}"}
+      continue   # read timed out; the deadline check at the top of the loop fires the wake
     else
       break   # tail ended
     fi
