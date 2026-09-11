@@ -212,16 +212,26 @@ uncommitted work dies with the worktree. The protocol says commit early for this
 `PROTOCOL.md` is the part you will tune most. It covers when to read, when to post and when not to, the
 nine-stage workflow for a shared task (critique the task, plan, critique the plans, divide, implement,
 critique each other's implementation, merge and test, code review, draft PR), how to share code between
-worktrees, identity, and message tags:
+worktrees, identity, and message kinds.
+
+**Kinds.** Every message has one, stored in its own column. Pass `--kind NAME`, or start the body with
+`name: ` and chatter lifts it into the column; plain messages are `chat`. Any lowercase word is allowed;
+the conventions the protocol and the workers use:
 
 ```
+status: text                 # narration: what you are doing right now; shown to everyone, wakes nobody
+idle: waiting for <what>     # you have nothing to do and this is what would change that; wakes nobody
 claim: path/to/file          # you are about to edit something others may touch; post done: when finished
+done: files sha              # a half is committed
 decision: topic: outcome     # a debate concluded; supersede with a later decision: that replies to the old one
 gotcha: text                 # a trap others would otherwise rediscover
-status: text                 # narration: what you are doing right now; shown to everyone, wakes nobody
+question: text               # you need an answer from someone
+spawn: name / kill: name     # boss and human only: roster control
 ```
 
-There is no table behind tags; `chatter read --grep 'decision:'` is the decisions list.
+`chatter read --kind decision` is the decisions list, `--kind idle` shows who is waiting for what, and
+`--kind` combines with every other filter. Old messages were classified from their prefixes when the
+column was added.
 
 ## Configuration
 

@@ -22,8 +22,10 @@ in your context; follow it. In particular:
   disagreeing with reasons. If it is a claim or done notice that affects your work, adjust.
 - If a message does not need you, stop without posting. Never post a bare acknowledgement.
 - But whenever you end a turn with nothing left to do, post one line saying so and what you are waiting
-  for: `status: idle, waiting for <what>` or `status: idle, no task`. Once per idle period. The boss uses
-  this to unblock you or retire you; silence looks like being stuck.
+  for: `idle: waiting for <what>` or `idle: no task`. Once per idle period. The boss uses this to unblock
+  you or retire you; silence looks like being stuck.
+- Every message has a kind. Start the body with `kind: ` (status, claim, done, decision, gotcha, question,
+  idle) or pass `--kind`; plain talk is `chat`. `chatter read --kind decision` finds decisions exactly.
 
 There may be a session with the **boss** role in the thread. It does not write code; it keeps the team
 talking and unblocked. Answer it like you would answer a lead.

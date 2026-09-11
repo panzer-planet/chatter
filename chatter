@@ -4,13 +4,16 @@
 
 function usage(int $code = 1): never {
     fwrite($code === 0 ? STDOUT : STDERR, <<<TXT
-usage: chatter post [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (reads stdin if MESSAGE omitted)
-       chatter read [--last N] [--since ID] [--unread] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
-       chatter tail [--last N] [--topic NAME] [--repo NAME] [--json]   (follow live; --last 0 blocks until something new)
+usage: chatter post [--kind KIND] [--as NAME] [--reply-to ID] [--topic NAME] [MESSAGE]   (reads stdin if MESSAGE omitted)
+       chatter read [--last N] [--since ID] [--unread] [--kind KIND] [--from NAME] [--grep TEXT] [--topic NAME] [--repo NAME] [--json]
+       chatter tail [--last N] [--kind KIND] [--topic NAME] [--repo NAME] [--json]   (follow live; --last 0 blocks until something new)
        chatter notify                                              (Claude Code PostToolUse hook; see README)
        chatter whoami                                              (author, repo and topic a post from here would carry)
        chatter help | -h | --help                                  (works after any subcommand too)
 
+       --kind    every message has one. Give it with --kind, or start the body with "kind: " and it is
+                 lifted out of the body. Any lowercase word; by convention: chat (default), status, claim,
+                 done, decision, gotcha, question, spawn, kill. Filter with read/tail --kind KIND.
        --unread  only messages since your last --unread; the cursor is stored per author name
        --from    authors starting with NAME        --grep  messages containing TEXT (case-insensitive)
        --topic   only that topic. Without it, CHATTER_TOPIC (if set) selects that topic plus untagged messages.
@@ -65,6 +68,7 @@ function db(): SQLite3 {
         reply_to   INTEGER,
         topic      TEXT,
         repo       TEXT,
+        kind       TEXT NOT NULL DEFAULT \'chat\',
         body       TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
     )');
@@ -73,6 +77,13 @@ function db(): SQLite3 {
     @$db->exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
     @$db->exec("ALTER TABLE messages ADD COLUMN topic TEXT");
     @$db->exec("ALTER TABLE messages ADD COLUMN repo TEXT");
+    if (@$db->exec("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'")) {   // newly added: lift prefixes out of old bodies
+        $res = $db->query('SELECT id, body FROM messages');
+        while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
+            [$kind, $body] = split_kind($row['body']);
+            if ($kind !== null) $db->exec(sprintf("UPDATE messages SET kind = '%s', body = '%s' WHERE id = %d", $kind, SQLite3::escapeString($body), $row['id']));
+        }
+    }
     $db->exec('CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_id INTEGER NOT NULL)');
     return $db;
 }
@@ -115,16 +126,24 @@ function scope_where(?string $topic, ?string $repo): string {
     return $w ? implode(' AND ', $w) : '1';
 }
 
+// "status: running tests" -> ['status', 'running tests']; anything else -> [null, body]. URLs don't match (no space after the colon).
+function split_kind(string $body): array {
+    return preg_match('/^([a-z][a-z0-9-]*):\s+(.+)$/s', $body, $m) ? [$m[1], $m[2]] : [null, $body];
+}
+
 function post(array $argv): void {
-    [$opts, $pos] = args($argv, ['as', 'reply-to', 'topic']);
+    [$opts, $pos] = args($argv, ['as', 'reply-to', 'topic', 'kind']);
     $author = $opts['as'] ?? author();
     if (!isset($pos[0]) && stream_isatty(STDIN)) usage();
     $body = trim($pos[0] ?? stream_get_contents(STDIN));
     if ($body === '') { fwrite(STDERR, "chatter: empty message (see chatter --help)\n"); exit(2); }
+    if (isset($opts['kind'])) { $kind = $opts['kind']; } else { [$kind, $body] = split_kind($body); $kind ??= 'chat'; }
+    if (!preg_match('/^[a-z][a-z0-9-]*$/', $kind)) { fwrite(STDERR, "chatter: kind must be a lowercase word, got '$kind'\n"); exit(1); }
 
     $topic = ($opts['topic'] ?? getenv('CHATTER_TOPIC')) ?: null;   // --topic '' posts untagged even when CHATTER_TOPIC is set
     $repo = repo_name();
-    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, body) VALUES (:a, :s, :r, :t, :p, :b)');
+    $st = db()->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, kind, body) VALUES (:a, :s, :r, :t, :p, :k, :b)');
+    $st->bindValue(':k', $kind);
     $st->bindValue(':t', $topic, $topic === null ? SQLITE3_NULL : SQLITE3_TEXT);
     $st->bindValue(':p', $repo, $repo === null ? SQLITE3_NULL : SQLITE3_TEXT);
     $st->bindValue(':a', $author);
@@ -135,9 +154,10 @@ function post(array $argv): void {
 }
 
 function read(array $argv): void {
-    [$opts] = args($argv, ['since', 'last', 'from', 'grep', 'topic', 'repo']);
+    [$opts] = args($argv, ['since', 'last', 'from', 'grep', 'topic', 'repo', 'kind']);
     $db = db();
     $where = [scope_where($opts['topic'] ?? null, $opts['repo'] ?? null)];
+    if (isset($opts['kind']))  $where[] = "kind = '" . SQLite3::escapeString($opts['kind']) . "'";
     if (isset($opts['since'])) $where[] = 'id > ' . (int)$opts['since'];
     if (isset($opts['unread'])) {
         $me = SQLite3::escapeString(author());
@@ -171,7 +191,7 @@ function print_rows(SQLite3Result $res, bool $json): int {
             $c('1', '#' . $row['id']),
             ($row['repo'] !== null ? $c('2', ' [' . $row['repo'] . ']') : '') . ($row['topic'] !== null ? $c('2', ' [' . $row['topic'] . ']') : '') . ($row['reply_to'] ? $c('2', ' (re #' . $row['reply_to'] . ')') : ''),
             $c('2', (new DateTime($row['created_at'], new DateTimeZone('UTC')))->setTimezone(localtz())->format('Y-m-d H:i')),
-            $c("1;$hue", $who),
+            $c('2', $row['kind']) . '  ' . $c("1;$hue", $who),
             $tty ? str_replace("\n", "\n    ", $row['body']) : $row['body']);
     }
     return $last;
@@ -191,7 +211,7 @@ function notify(): void {
     $res = $db->query("SELECT * FROM messages WHERE id > $cur AND session != '" . SQLite3::escapeString($sess) . "' AND " . scope_where(null, null) . " ORDER BY id");
     $lines = [];
     while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
-        $lines[] = sprintf('#%d%s%s%s %s: %s', $row['id'], $row['repo'] !== null ? " [{$row['repo']}]" : '', $row['topic'] !== null ? " [{$row['topic']}]" : '', $row['reply_to'] ? " (re #{$row['reply_to']})" : '', $row['author'], $row['body']);
+        $lines[] = sprintf('#%d%s%s%s %s %s: %s', $row['id'], $row['repo'] !== null ? " [{$row['repo']}]" : '', $row['topic'] !== null ? " [{$row['topic']}]" : '', $row['reply_to'] ? " (re #{$row['reply_to']})" : '', $row['kind'], $row['author'], $row['body']);
     }
     if (!$lines) return;
     echo json_encode(['hookSpecificOutput' => [
@@ -201,10 +221,11 @@ function notify(): void {
 }
 
 function tail(array $argv): void {
-    [$opts] = args($argv, ['last', 'topic', 'repo']);
+    [$opts] = args($argv, ['last', 'topic', 'repo', 'kind']);
     $db = db();
     $n = (int)($opts['last'] ?? 20);
     $w = scope_where($opts['topic'] ?? null, $opts['repo'] ?? null);
+    if (isset($opts['kind'])) $w .= " AND kind = '" . SQLite3::escapeString($opts['kind']) . "'";
     $since = (int)$db->querySingle('SELECT COALESCE(MAX(id), 0) FROM messages');
     print_rows($db->query("SELECT * FROM (SELECT * FROM messages WHERE $w ORDER BY id DESC LIMIT $n) ORDER BY id"), isset($opts['json']));
     while (true) { // ponytail: 2s poll; good enough for humans and agents, no server needed

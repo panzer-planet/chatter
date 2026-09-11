@@ -35,9 +35,11 @@ Sibling worktrees share one repository, so a commit in one is visible from the o
 - To pick up another session's work: `git merge <their-branch>` or `git cherry-pick <sha>` from your own worktree.
 - When you commit something the other half depends on, post the branch name and short sha.
 
-## Tags
+## Kinds
 
-Start a message with a tag when it is a fact others will want to look up later, so `chatter read --grep 'tag:'` finds it without reading the whole thread:
+Every message has a kind. Give it with `--kind NAME`, or start the body with `name: ` and chatter lifts it
+out of the body into the kind. Plain messages are `chat`. Kinds are open-ended, any lowercase word, but use
+these so that `chatter read --kind NAME` finds exactly what you mean:
 
 - `claim: path/to/file` while you are editing something other worktrees may also touch. Post `done: path/to/file` when you finish.
 - `decision: <topic>: <outcome>` when a debate concludes. Supersede with a later `decision:` that replies to the old one.
@@ -55,11 +57,14 @@ chatter post "gotcha: UserTest::testExport is flaky under parallel runs, retry b
 chatter post "status: working on the admin controllers, ExportController first"
 chatter post "status: running the full suite"
 
-chatter read --grep 'decision:'      # every standing decision, oldest first
-chatter read --grep 'claim:'         # who is in which files
+chatter post --kind question "which queue should the export job use?"
+
+chatter read --kind decision         # every standing decision, oldest first
+chatter read --kind claim            # who is in which files
+chatter read --kind idle             # who is waiting, and for what
 ```
 
-Tags are plain text. There is no table behind them; grep is the index.
+Displayed as `#12 [platform] [YEN-54] status  dev-yen54/worktree-dev-yen54: running the suite`.
 
 ## When to read
 
@@ -124,8 +129,8 @@ to a query scope". The human watches the thread like a dashboard, and teammates 
 on you. A few per task piece is right; one per tool call is too many.
 
 **Report idleness.** Whenever you end a turn with nothing left to do, say so and say what would change
-that: `status: idle, waiting for dev-yen54's done:`, `status: idle, waiting for CI on PR 1303`,
-`status: idle, no task`. Post it once per idle period, not on every wake. An idle dev that says nothing
+that, as kind `idle`: `idle: waiting for dev-yen54's done:`, `idle: waiting for CI on PR 1303`,
+`idle: no task`. Post it once per idle period, not on every wake. An idle dev that says nothing
 looks like a dev that is stuck, and a dev waiting for something that has already happened is a dev that
 can be unblocked in one message, but only if the thread shows what it is waiting for.
 

@@ -103,10 +103,10 @@ if [ "$role" = boss ]; then
   # Control messages. The boss's model has no shell for this; it posts "spawn: NAME [flags]" or "kill: NAME"
   # and this loop, a long-lived process, does it. The same lines from the human (no session) are honoured too.
   # Nobody else's are. Spawned devs are children of this process and die with it.
-  control() {  # $1 = message body
-    local verb=${1%%:*} rest=${1#*: } name flags
+  control() {  # $1 = kind (spawn|kill), $2 = body: NAME [flags]
+    local verb=$1 rest=$2 name flags
     name=${rest%% *}; [[ $rest == *" "* ]] && flags=${rest#* } || flags=""
-    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { say "status: refused '$1': bad name"; return; }
+    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { say "status: refused '$verb: $rest': bad name"; return; }
     case $verb in
       spawn)
         local p; for p in "$run"/*.pid; do [ -f "$p" ] && ! kill -0 "$(cat "$p")" 2>/dev/null && rm -f "$p"; done   # prune dead
@@ -146,9 +146,9 @@ ${failed:-$out}"
       next=$(( $(date +%s) + interval )); continue
     fi
     if IFS= read -r -t "$(( next - now ))" line <&3; then
-      body=$(jq -r .body <<<"$line")
-      if [[ $body == spawn:\ * || $body == kill:\ * ]]; then
-        [[ $line == *"\"session\":\"${sid:0:8}\""* || $line == *"\"session\":\"\""* ]] && control "$body"
+      body=$(jq -r .body <<<"$line"); kind=$(jq -r .kind <<<"$line")
+      if [[ $kind == spawn || $kind == kill ]]; then
+        [[ $line == *"\"session\":\"${sid:0:8}\""* || $line == *"\"session\":\"\""* ]] && control "$kind" "$body"
         continue
       fi
       [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
@@ -161,7 +161,7 @@ ${failed:-$out}"
       fi
       # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
       if [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
-      elif [[ $body == decision:* ]]; then why="A stage transition was posted: ${body:0:120}"
+      elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
       elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
       else continue; fi
       echo "chatter-agent: waking: ${why:0:120}" >&2
@@ -180,17 +180,17 @@ else
   open_tail
   while IFS= read -r line <&3; do
     [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
-    [[ $line == *"\"body\":\"status:"* ]] && continue   # narration informs but does not wake; the hook shows it on the next real turn
+    case $(jq -r .kind <<<"$line") in status|idle) continue ;; esac   # narration informs but does not wake; the hook shows it on the next real turn
     id=$(jq -r .id <<<"$line")
     seen=$(sqlite3 "$db" "SELECT last_id FROM cursors WHERE name='$cursor'" 2>/dev/null)
     [[ -n $seen && $id -le $seen ]] && continue        # already seen during the previous turn
-    msg=$(jq -r '"#\(.id)\(if .reply_to then " (re #\(.reply_to))" else "" end) \(.author): \(.body)"' <<<"$line")
+    msg=$(jq -r '"#\(.id)\(if .reply_to then " (re #\(.reply_to))" else "" end) \(.kind) \(.author): \(.body)"' <<<"$line")
     echo "chatter-agent: waking on: ${msg:0:120}" >&2
     turn "New chatter message at $(date '+%H:%M'):
 
 $msg
 
-If this needs you (it is addressed to you, affects your work, or asks something you can answer), run 'chatter read --unread' for context and act according to your role. If it does not need you, stop immediately without posting or running anything. Exception: if acting on it leaves you with nothing left to do, end with one line 'status: idle, waiting for <what>' so the team knows." --resume "$sid" ${args[@]+"${args[@]}"}
+If this needs you (it is addressed to you, affects your work, or asks something you can answer), run 'chatter read --unread' for context and act according to your role. If it does not need you, stop immediately without posting or running anything. Exception: if acting on it leaves you with nothing left to do, end with one line 'idle: waiting for <what>' so the team knows." --resume "$sid" ${args[@]+"${args[@]}"}
     sqlite3 "$db" "INSERT OR REPLACE INTO cursors (name, last_id) VALUES ('$cursor', MAX($id, COALESCE((SELECT last_id FROM cursors WHERE name='$cursor'), 0)))" 2>/dev/null
   done
 fi
