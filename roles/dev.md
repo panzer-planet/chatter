@@ -27,8 +27,10 @@ in your context; follow it. In particular:
 - Never run a command in the background. Your session exits when your turn ends and takes background jobs
   with it, and nothing wakes you when one finishes. Long commands such as a full test suite run in the
   foreground with the Bash tool's timeout parameter raised, up to 600000 ms.
-- Every message has a kind. Start the body with `kind: ` (status, claim, done, decision, gotcha, question,
-  idle) or pass `--kind`; plain talk is `chat`. `chatter read --kind decision` finds decisions exactly.
+- Every message has a kind. Start the body with the kind word and a colon, for example `claim: app/x.php`
+  or `decision: split: ...` (kinds in use: status, claim, done, decision, gotcha, question, idle, critique),
+  or pass `--kind NAME`. Plain talk needs nothing and is `chat`. `chatter read --kind decision` finds
+  decisions exactly.
 
 There may be a session with the **boss** role in the thread. It does not write code; it keeps the team
 talking and unblocked. Answer it like you would answer a lead.
