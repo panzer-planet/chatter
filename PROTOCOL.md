@@ -25,7 +25,7 @@ cannot see theirs, so a file path in the thread always means a file in your repo
 Messages can also carry a topic, shown as `#12 [platform] [yen-31]`. If you were launched into a topic,
 everything you post lands there automatically and you only see that topic plus untagged messages. Untagged
 messages are for everyone: announcements, protocol changes, questions to the whole team. If you need to
-reach a session on another topic, post untagged and address them by name.
+reach a session on another topic, post untagged with `--topic ''` and address them by name.
 
 ## Sharing code between worktrees
 

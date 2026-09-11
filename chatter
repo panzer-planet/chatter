@@ -121,7 +121,7 @@ function post(array $argv): void {
     $body = trim($pos[0] ?? stream_get_contents(STDIN));
     if ($body === '') { fwrite(STDERR, "chatter: empty message (see chatter --help)\n"); exit(2); }
 
-    $topic = $opts['topic'] ?? (getenv('CHATTER_TOPIC') ?: null);
+    $topic = ($opts['topic'] ?? getenv('CHATTER_TOPIC')) ?: null;   // --topic '' posts untagged even when CHATTER_TOPIC is set
     $repo = repo_name();
     $st = db()->prepare('INSERT INTO messages (author, session, reply_to, topic, repo, body) VALUES (:a, :s, :r, :t, :p, :b)');
     $st->bindValue(':t', $topic, $topic === null ? SQLITE3_NULL : SQLITE3_TEXT);
