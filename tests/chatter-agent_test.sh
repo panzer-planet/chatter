@@ -198,6 +198,22 @@ gh() { return 143; }
 watch_ci https://github.com/o/r/pull/9 dev1; wait $!
 assert "watch_ci posts nothing when gh is killed" [ ! -s "$said" ]
 
+# a PR's checks take a moment to register: "no checks reported" is retried before it becomes "no CI configured"
+calls="$WORK/ghcalls"
+rm -f "$said"; : >"$calls"
+# shellcheck disable=SC2329
+gh() { echo x >>"$calls"; [ "$(wc -l <"$calls")" -ge 2 ] && return 0; echo "no checks reported on the 'b' branch"; return 1; }
+# shellcheck disable=SC2329  # sleep is stubbed for the eval'd watch_ci()
+( sleep() { :; }; watch_ci https://github.com/o/r/pull/9 dev1; wait $! )
+assert_contains "watch_ci retries a PR whose checks have not registered yet" "$(cat "$said")" "status: CI green on"
+rm -f "$said"; : >"$calls"
+# shellcheck disable=SC2329
+gh() { echo x >>"$calls"; echo "no checks reported on the 'b' branch"; return 1; }
+# shellcheck disable=SC2329  # sleep is stubbed for the eval'd watch_ci()
+( sleep() { :; }; watch_ci https://github.com/o/r/pull/9 dev1; wait $! )
+assert_contains "watch_ci calls a PR checkless only after its retries" "$(cat "$said")" "no CI configured"
+assert_eq "watch_ci gives up after three tries" "$(wc -l <"$calls" | tr -d ' ')" 3
+
 ### status: namespaced by repo, so a same-named worker in two repos doesn't collide and each row says which repo ###
 
 sleep 60 & pidA=$!

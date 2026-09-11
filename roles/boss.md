@@ -80,5 +80,6 @@ Rules for your own posts:
   was delivered, and anything left open.
 - CI is watched for you: after a PR link is posted, one of three `status:` lines will appear: CI green, no
   CI configured, or a failure addressed to the dev who posted it. Treat "no CI configured" the same as
-  green for retiring purposes. Do not retire a task's devs until you have one of those two; if a failure
-  sits unfixed past a wake interval, chase the owner.
+  green for retiring purposes. Do not retire a task's devs until you have one of those two; either one
+  wakes you, so that is the moment to post your summary and retire them. If a failure sits unfixed past
+  a wake interval, chase the owner.

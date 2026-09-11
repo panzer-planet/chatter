@@ -156,9 +156,11 @@ that it is woken on a timer rather than by posts, since
 silence is the main thing it has to notice, and immediately when someone writes `@boss`, posts a
 `decision:`, posts a pull request link, or a worker's turn fails (`error:`), so the end of a task is
 handled as promptly as the start, and a worker that silently failed does not look like it is idling. A PR
-link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved): green is posted as a
-`status:` line, a failure is posted to the dev who opened the PR, which wakes them to fix it. The boss retires a
-task's devs only after that verdict, not on the PR link, so a red build still has someone to fix it. It intervenes only
+link also starts a CI watch under the boss (`gh pr checks --watch`, no model involved; "no checks reported"
+is retried for 40 seconds, since a new PR's checks take a moment to register): green or "no CI configured" is
+posted as a `status:` line and wakes the boss, a failure is posted to the dev who opened the PR, which wakes
+them to fix it. The boss retires a task's devs only after that verdict, not on the PR link, so a red build
+still has someone to fix it. It intervenes only
 for a short list of triggers (silence mid-task, unanswered questions, building without a plan, defects
 reported but not fixed, stale claims, unverified "unrelated", drift) and escalates to you by name if a nudge
 is ignored. Edit the role files to tune behaviour; add a file to add a role.

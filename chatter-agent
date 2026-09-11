@@ -245,9 +245,12 @@ if [ "$role" = boss ]; then
   # green as a status: line, red addressed to whoever posted the link, which wakes them to fix it.
   watch_ci() {  # $1 = PR url, $2 = author who posted it
     [ -n "$1" ] || return
-    ( out=$(gh pr checks "$1" --watch 2>&1); ci_rc=$?
-      [ $ci_rc -gt 128 ] && exit   # gh was killed, this boss is going down: no verdict, so say nothing
-      if [ $ci_rc -eq 0 ]; then say "status: CI green on $1"
+    ( for try in 1 2 3; do   # a PR's checks take a few seconds to register after it opens: not "no CI" yet
+        out=$(gh pr checks "$1" --watch 2>&1); ci_rc=$?
+        grep -q 'no checks reported' <<<"$out" || break; [ "$try" = 3 ] || sleep 20
+      done
+      [ "$ci_rc" -gt 128 ] && exit   # gh was killed, this boss is going down: no verdict, so say nothing
+      if [ "$ci_rc" -eq 0 ]; then say "status: CI green on $1"
       elif grep -q 'no checks reported' <<<"$out"; then say "status: no CI configured for $1, skipping"
       else   # --watch output repeats the table on every refresh, the first ones still pending; ask once more for the final one
         failed=$(gh pr checks "$1" 2>/dev/null | awk -F'\t' '$2 != "pass" && $2 != "skipping" {print "  " $1 ": " $2 ($4 ? " " $4 : "")}' | head -8)
@@ -276,7 +279,8 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
         [[ $line == *"\"session\":\"${sid:0:8}\""* || $line == *"\"session\":\"\""* ]] && control "$kind" "$body"
         continue
       fi
-      [[ $line == *"\"session\":\"${sid:0:8}\""* ]] && continue
+      ci_verdict=""; [[ $kind == status && ( $body == "CI green on "* || $body == "no CI configured for "* ) ]] && ci_verdict=1
+      [[ $line == *"\"session\":\"${sid:0:8}\""* && -z $ci_verdict ]] && continue   # its own posts don't wake it, except watch_ci's verdict
       author=$(jq -r .author <<<"$line"); short=${author%%/*}
       if [[ $pending == *" $short "* ]]; then
         pending=${pending/ $short / }
@@ -285,7 +289,8 @@ Run 'chatter read --unread' and act according to your role. Post nothing unless 
         continue
       fi
       # Wake early on a mention, a stage transition (decision:) or a PR link; everything else waits for the timer.
-      if [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
+      if [[ -n $ci_verdict ]]; then why="The CI verdict you retire devs on arrived: ${body:0:120}"   # before the /pull/ test: the verdict carries the URL
+      elif [[ $line == *"@boss"* ]]; then why="Someone mentioned @boss"
       elif [[ $kind == decision ]]; then why="A stage transition was posted: decision: ${body:0:120}"
       elif [[ $kind == error ]]; then why="A worker turn failed: ${body:0:120}"
       elif [[ $body == *"/pull/"* ]]; then why="A pull request link was posted: ${body:0:120}"; watch_ci "$(grep -o 'https://[^ )>]*/pull/[0-9]*' <<<"$body" | head -1)" "$author"
