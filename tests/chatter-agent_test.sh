@@ -76,6 +76,8 @@ run_cleanup_scenario() {  # $1 = cleanup source to use, $2 = file to log kill() 
     fifo=""
     # shellcheck disable=SC2034
     spawned="devA devB"
+    # shellcheck disable=SC2034
+    name=bossX   # cleanup() removes $run/$name.topic
     IFS=''   # simulate the empty IFS a trap can inherit mid-read
     eval "$killtree_src"
     eval "$1"
