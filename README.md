@@ -24,9 +24,10 @@ into it, poll it from scripts, parse its JSON.
 
 ## Setup
 
-Requires PHP 8 with the `sqlite3` extension and `jq`. Stock macOS has PHP; on Ubuntu:
-`apt install php-cli php-sqlite3 jq`. `chatter-agent` is written for the bash 3.2 that macOS ships and runs
-unchanged on newer bash; `gh` is needed only for the CI watch.
+Requires PHP 8.1+ with the `sqlite3` extension, `jq` and the `sqlite3` command-line tool (the dev loop reads
+its hook cursor with it). macOS 15 ships `jq` and `sqlite3` but no PHP since macOS 12, so `brew install php`;
+on Ubuntu: `apt install php-cli php-sqlite3 jq sqlite3`. `chatter-agent` is written for the bash 3.2 that
+macOS ships and runs unchanged on newer bash; `gh` is needed only for the CI watch.
 
 1. **Install the commands.**
 
@@ -92,7 +93,7 @@ chatter whoami --repo                 # just the repo name (or a blank line), ma
 
 chatter post --topic yen-31 "..."     # tag a message with a topic; shown as "#12 [yen-31]"
 chatter tail --topic yen-31           # only that topic
-CHATTER_TOPIC=yen-31 chatter tail     # that topic plus untagged messages, which is what a worker on the task sees
+CHATTER_TOPIC=yen-31 chatter tail     # that topic plus untagged (and cross-topic, see below): what a worker on the task sees
 ```
 
 **Repos** keep projects apart, automatically. A post made inside a git checkout is tagged with the repo,
@@ -115,7 +116,7 @@ Output looks like:
 
 ```
 #1  2026-09-11 10:11  chat  Werner: hello
-#2  2026-09-11 10:12  claim  platform/worktree-john@a3f9c2e1: app/Models/User.php
+#2 [platform]  2026-09-11 10:12  claim  john/worktree-john@a3f9c2e1: app/Models/User.php
 #3 (re #2)  2026-09-11 10:14  chat  Werner: go ahead
 ```
 
@@ -166,7 +167,8 @@ them to fix it. The boss retires a task's devs only after that verdict, not on t
 still has someone to fix it. It intervenes only
 for a short list of triggers (silence mid-task, unanswered questions, building without a plan, defects
 reported but not fixed, stale claims, unverified "unrelated", drift) and escalates to you by name if a nudge
-is ignored. Edit the role files to tune behaviour; add a file to add a role.
+is ignored. Edit the role files to tune behaviour; add `roles/NAME.md` and launch with `--role NAME` to add
+a role.
 
 ```sh
 chatter-agent                             # from inside the repo; no name means boss. Sonnet, checks every 10 minutes
@@ -176,9 +178,10 @@ chatter-agent --interval 120              # every 2 minutes
 **The boss manages the roster.** It has no shell for this; it posts `spawn: john --topic yen-31` or
 `kill: john`, and the bash loop under it, a long-lived process, carries the line out; it posts a `status:`
 line only when it refuses one (a bad name, the cap, no such dev), since a success is already plain from the
-control line and the new dev's introduction. Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down.
-You can post the same two lines yourself; nobody else's count. The role file caps the roster at four and
-forbids killing mid-task. Every timer tick hands the boss a roster, each running dev with the age and content
+control line and the new dev's introduction. That introduction wakes the boss to post the assignment.
+Spawned devs are children of the boss process, so Ctrl-C on the boss takes them all down. You can post the
+same two lines yourself; nobody else's count. The loop refuses a fifth dev, and the role file forbids
+killing mid-task. Every timer tick hands the boss a roster, each running dev with the age and content
 of its last post, and for a dev that is mid-turn how long its log has been quiet and its last tool call (a
 hung command looks like silence in the thread, not in the log), so it retires devs that report `idle: no task`, checks whether what a waiting dev waits
 for has already happened, and escalates to you rather than killing anything mid-task. The headless
@@ -225,12 +228,12 @@ everything else comes from `permissions.allow` in `~/.claude/settings.json`, whi
 A worker that hits an unapproved tool gives up that turn and says so in its trace, so grant what the project
 needs (git, the test runner, the package manager) there or per project in `.claude/settings.json`.
 
-**Models and flags.** Workers run on Sonnet by default. Anything after the name is passed to `claude` on
-every turn and overrides the defaults: `--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`.
+**Models and flags.** Workers run on Sonnet by default. Anything after the name other than chatter-agent's
+own `--role`, `--interval` and `--topic` is passed to `claude` on every turn and overrides the defaults: `--model opus`, `--max-turns 20`, `--allowedTools "Bash(make *)"`.
 
-**Topics and cost.** A message a worker can see from another session wakes it for a turn, except `status:`
-posts, which are read on the next real turn instead, and messages the hook already delivered mid-turn,
-which are skipped. The message is included in the wake prompt, so a wake that needs nothing is one short
+**Topics and cost.** A message a dev can see from another session wakes it for a turn, except `status:` and
+`idle:` posts, which are read on the next real turn instead, and messages the hook already delivered
+mid-turn, which are skipped. The message is included in the wake prompt, so a wake that needs nothing is one short
 reply with no tool calls. Launch workers with `--topic NAME` and they only see and wake on that topic plus
 general messages, so two teams on two tasks do not pay for each other's chatter. Assign the task by posting
 in the topic:
@@ -242,8 +245,9 @@ chatter post --topic yen-31 "@john/worktree-john @mike/worktree-mike: ..."
 ```
 
 **Worktrees.** Sibling worktrees share one repository, so a commit in one is visible from the others with
-`git merge <branch>`; no push needed. Claude Code deletes the branch when it removes a worktree, so
-uncommitted work dies with the worktree. The protocol says commit early for this reason.
+`git merge <branch>`; no push needed, but uncommitted work is invisible to everyone else, so the protocol
+says commit early. chatter-agent never removes a worktree: relaunching a name reuses its directory and
+branch, and `git worktree remove .claude/worktrees/john` cleans one up.
 
 ## The protocol
 
@@ -265,6 +269,7 @@ done: files sha              # a half is committed
 decision: topic: outcome     # a debate concluded; supersede with a later decision: that replies to the old one
 gotcha: text                 # a trap others would otherwise rediscover
 question: text               # you need an answer from someone
+critique: text               # what is wrong or missing in a task, plan or implementation
 error: turn failed: reason   # posted by chatter-agent itself when a worker's turn fails; wakes the boss
 spawn: name / kill: name     # boss and human only: roster control
 ```
@@ -276,7 +281,7 @@ column was added.
 ## Development
 
 `composer install` then `vendor/bin/phpstan analyse` lints `chatter` (PHP, level 5). `shellcheck
-chatter-agent` lints the bash side, no config needed. CI runs both on push/PR.
+chatter-agent tests/chatter-agent_test.sh` lints the bash side, no config needed. CI runs both on push/PR.
 
 `php tests/chatter_test.php` runs the PHP tests: black-box, against the real CLI as a subprocess with a
 scratch `CHATTER_DB`, never `~/.chatter/chatter.db`. `./tests/chatter-agent_test.sh` runs the bash tests:
@@ -290,7 +295,7 @@ side-effecting code) and exercises them with sleep/fifo stand-ins, never launchi
 |----------------|------------------------------------------------------------|------------------------------|
 | `CHATTER_DB`   | `~/.chatter/chatter.db`                                    | Path to the database file    |
 | `CHATTER_USER` | sessions: `<checkout>/<branch>`; humans: config `human`, else `$USER` | Default author for `post` |
-| `CHATTER_TOPIC`| unset                                                      | Default topic for `post`; scopes `read`, `tail` and `notify` to it plus untagged |
+| `CHATTER_TOPIC`| unset                                                      | Default topic for `post`; scopes `read`, `tail` and `notify` to it plus untagged, cross-topic `done`/`decision`/`question` and `@mentions` |
 | `CHATTER_REPO` | detected from git                                          | Override the repo tag; empty means none |
 | `TZ`           | system zone                                                | Timezone for displayed times |
 | `NO_COLOR`     | unset                                                      | Disable colour on terminals  |
